@@ -18,6 +18,8 @@
 #include "EVENT_FLAGS.hpp"
 #include "MOAB_DEFINITIONS.h"
 
+#include "misc_math.hpp"
+
 #include "daemons/IMU_daemon.hpp"
 #include "daemons/GPS_daemon.hpp"
 #include "daemons/RTCM3_daemon.hpp"
@@ -25,6 +27,7 @@
 
 #include "SbusParser.hpp"
 #include "MotorControl.hpp"
+#include "XWheels.hpp"
 
 
 EventFlags event_flags;
@@ -48,19 +51,24 @@ DigitalOut myledG(LED1, 0);
 DigitalOut myledB(LED2, 0);
 
 
+
+uint16_t sbus_a_forImuPacket = 0;
+uint16_t sbus_b_forImuPacket = 0;
+
 // *** NOTE: By default, mbed-os only allows for 4 sockets, so
 // *** we will re-use the tx_sock (non-blocking) wherever possible.
 
 // Background I/O processes:
 //  (minimal inter-dependence; mostly independent of anything else)
-IMU_daemon imu_daemon(&tx_sock);
+IMU_daemon imu_daemon(&tx_sock, &sbus_a_forImuPacket, &sbus_b_forImuPacket);
 GPS_daemon gps_daemon(PE_8, PE_7, &net);
 //RTCM3_daemon rtcm3_daemon(PD_5, PD_6, &tx_sock);
 PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
 
 
 // Motors:
-MotorControl motorControl(PD_14, PD_15);
+//MotorControl motorControl(PD_14, PD_15);
+XWheels drive(PD_1, PD_0);
 
 
 // S.Bus is 100000Hz, 8E2, electrically inverted
@@ -139,8 +147,11 @@ void set_mode_sbus_failsafe() {
 	myledG = 0;
 	myledB = 0;
 
-	motorControl.set_steering(1024);
-	motorControl.set_throttle(352);
+	//motorControl.set_steering(1024);
+	//motorControl.set_throttle(352);
+	drive.setRPMs(0.0, 0.0);
+	sbus_a_forImuPacket = 1024;
+	sbus_b_forImuPacket = 352;
 }
 
 void set_mode_stop() {
@@ -148,8 +159,11 @@ void set_mode_stop() {
 	myledG = 0;
 	myledB = 0;
 
-	motorControl.set_steering(sbup.ch1);
-	motorControl.set_throttle(352);
+	//motorControl.set_steering(sbup.ch1);
+	//motorControl.set_throttle(352);
+	drive.setRPMs(0.0, 0.0);
+	sbus_a_forImuPacket = 1024;
+	sbus_b_forImuPacket = 352;
 }
 
 void set_mode_manual() {
@@ -157,8 +171,18 @@ void set_mode_manual() {
 	myledG = 1;
 	myledB = 0;
 
-	motorControl.set_steering(sbup.ch1);
-	motorControl.set_throttle(sbup.ch3);
+	float leftWheel = 0;
+	float rightWheel = 0;
+
+	calc_sbus_to_skid_mode(sbup.ch1, sbup.ch3, &leftWheel, &rightWheel);
+
+	float leftRPM = 144 * leftWheel;
+	float rightRPM = 144 * rightWheel;
+
+	//u_printf("manual motor: %f %f\n", leftRPM, rightRPM);
+	drive.setRPMs(rightRPM, leftRPM);
+	sbus_a_forImuPacket = sbup.ch1;
+	sbus_b_forImuPacket = sbup.ch3;
 }
 
 void set_mode_auto() {
@@ -166,8 +190,18 @@ void set_mode_auto() {
 	myledG = 0;
 	myledB = 1;
 
-	motorControl.set_steering(auto_ch1);
-	motorControl.set_throttle(auto_ch2);
+	float leftWheel = 0;
+	float rightWheel = 0;
+
+	calc_sbus_to_skid_mode(auto_ch1, auto_ch2, &leftWheel, &rightWheel);
+
+	float leftRPM = 144 * leftWheel;
+	float rightRPM = 144 * rightWheel;
+
+	u_printf("auto motor: %f %f\n", leftRPM, rightRPM);
+	drive.setRPMs(rightRPM, leftRPM);
+	sbus_a_forImuPacket = auto_ch1;
+	sbus_b_forImuPacket = auto_ch2;
 }
 
 
@@ -311,6 +345,9 @@ int main() {
 	pushButton_daemon.Start();  // will start a separate thread
 
 
+	drive.Start(); // will start a separate thread
+
+
 	hb_led.period(0.02);
 	hb_led.write(0.0);
 
@@ -332,13 +369,13 @@ int main() {
 		u_printf("heartbeat: %d\n", ct);
 
 		// Report motor values (for convience when setting trim)
-		uint16_t sbus_a = motorControl.get_value_a();
-		float pw_a = motorControl.get_pw_a();
-		u_printf("steering: %d %f\n", sbus_a, pw_a);
+		//uint16_t sbus_a = motorControl.get_value_a();
+		//float pw_a = motorControl.get_pw_a();
+		//u_printf("steering: %d %f\n", sbus_a, pw_a);
 
-		uint16_t sbus_b = motorControl.get_value_b();
-		float pw_b = motorControl.get_pw_b();
-		u_printf("throttle: %d %f\n", sbus_b, pw_b);
+		//uint16_t sbus_b = motorControl.get_value_b();
+		//float pw_b = motorControl.get_pw_b();
+		//u_printf("throttle: %d %f\n", sbus_b, pw_b);
 
 
 	}

@@ -59,11 +59,14 @@ struct multi_data {
 
 class IMU_daemon {
 public:
-	IMU_daemon(UDPSocket*);
+	IMU_daemon(UDPSocket*, uint16_t*, uint16_t*);
 
 	void Start();
 
 private:
+
+	uint16_t *_sbus_a;
+	uint16_t *_sbus_b;
 
 	struct multi_data _mData;
 
