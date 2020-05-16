@@ -198,7 +198,7 @@ void set_mode_auto() {
 	float leftRPM = 144 * leftWheel;
 	float rightRPM = 144 * rightWheel;
 
-	u_printf("auto motor: %f %f\n", leftRPM, rightRPM);
+	//u_printf("auto motor: %f %f\n", leftRPM, rightRPM);
 	drive.setRPMs(rightRPM, leftRPM);
 	sbus_a_forImuPacket = auto_ch1;
 	sbus_b_forImuPacket = auto_ch2;
