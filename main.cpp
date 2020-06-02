@@ -52,8 +52,8 @@ DigitalOut myledB(LED2, 0);
 
 
 
-uint16_t sbus_a_forImuPacket = 0;
-uint16_t sbus_b_forImuPacket = 0;
+uint16_t sbus_a_forImuPacket = 1024;
+uint16_t sbus_b_forImuPacket = 352;
 
 // *** NOTE: By default, mbed-os only allows for 4 sockets, so
 // *** we will re-use the tx_sock (non-blocking) wherever possible.
