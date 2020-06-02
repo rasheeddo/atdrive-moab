@@ -48,12 +48,16 @@ DigitalOut myledG(LED1, 0);
 DigitalOut myledB(LED2, 0);
 
 
+uint16_t sbus_a_forImuPacket = 0;
+uint16_t sbus_b_forImuPacket = 0;
+
+
 // *** NOTE: By default, mbed-os only allows for 4 sockets, so
 // *** we will re-use the tx_sock (non-blocking) wherever possible.
 
 // Background I/O processes:
 //  (minimal inter-dependence; mostly independent of anything else)
-IMU_daemon imu_daemon(&tx_sock);
+IMU_daemon imu_daemon(&tx_sock, &sbus_a_forImuPacket, &sbus_b_forImuPacket);
 GPS_daemon gps_daemon(PE_8, PE_7, &net);
 //RTCM3_daemon rtcm3_daemon(PD_5, PD_6, &tx_sock);
 PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
@@ -141,6 +145,9 @@ void set_mode_sbus_failsafe() {
 
 	motorControl.set_steering(1024);
 	motorControl.set_throttle(352);
+
+	sbus_a_forImuPacket = 1024;
+	sbus_b_forImuPacket = 352;
 }
 
 void set_mode_stop() {
@@ -150,6 +157,9 @@ void set_mode_stop() {
 
 	motorControl.set_steering(sbup.ch1);
 	motorControl.set_throttle(352);
+
+	sbus_a_forImuPacket = 1024;
+	sbus_b_forImuPacket = 352;
 }
 
 void set_mode_manual() {
@@ -159,6 +169,9 @@ void set_mode_manual() {
 
 	motorControl.set_steering(sbup.ch1);
 	motorControl.set_throttle(sbup.ch3);
+
+	sbus_a_forImuPacket = sbup.ch1;
+	sbus_b_forImuPacket = sbup.ch3;
 }
 
 void set_mode_auto() {
@@ -168,6 +181,9 @@ void set_mode_auto() {
 
 	motorControl.set_steering(auto_ch1);
 	motorControl.set_throttle(auto_ch2);
+
+	sbus_a_forImuPacket = auto_ch1;
+	sbus_b_forImuPacket = auto_ch2;
 }
 
 

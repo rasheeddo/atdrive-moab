@@ -33,9 +33,12 @@ ShaftEncoder shaft(PE_11);
 
 
 
-IMU_daemon::IMU_daemon(UDPSocket *tx_sock) {
+IMU_daemon::IMU_daemon(UDPSocket *tx_sock, uint16_t *sbusA, uint16_t *sbusB) {
 	memset(&_mData, 0, sizeof(_mData));
 	_mData.version = 1;
+
+	_sbus_a = sbusA;
+	_sbus_b = sbusB;
 
 	_sock = tx_sock;
 }
@@ -91,8 +94,8 @@ void IMU_daemon::main_worker() {
 			int retval = bno1.get_data(_mData.bnoData);
 
 			if (retval == 22) {
-				_mData.sbus_a = 0;//motorControl.get_value_a();
-				_mData.sbus_b = 0;//motorControl.get_value_b();
+				_mData.sbus_a = *_sbus_a;
+				_mData.sbus_b = *_sbus_b;
 
 #ifdef _TWO_SHAFT_ENCODERS
 				_mData.shaft_a_pps = shaft_a.get_pps();
