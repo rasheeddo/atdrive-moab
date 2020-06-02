@@ -1,0 +1,64 @@
+odrv0.axis0.motor.config.calibration_current = 40
+odrv0.axis0.motor.config.current_lim = 90
+odrv0.axis0.encoder.config.calib_range = 0.05
+odrv0.config.dc_bus_overvoltage_trip_level = 33
+odrv0.axis0.motor.config.pole_pairs = 10
+odrv0.axis0.encoder.config.cpr = 60
+odrv0.axis0.motor.config.resistance_calib_max_voltage = 4
+odrv0.axis0.motor.config.requested_current_range = 80
+odrv0.axis0.motor.config.inverter_temp_limit_upper = 170.0
+odrv0.axis0.motor.config.current_control_bandwidth = 1000
+odrv0.axis0.encoder.config.mode = ENCODER_MODE_HALL
+odrv0.axis0.encoder.config.bandwidth = 100
+odrv0.axis0.controller.config.pos_gain = 1
+odrv0.axis0.controller.config.vel_gain = 0.1
+odrv0.axis0.controller.config.vel_integrator_gain = 0.1
+odrv0.axis0.controller.config.vel_limit = 1000
+odrv0.axis0.controller.config.vel_ramp_rate = 1032.0
+odrv0.axis0.controller.config.control_mode = CTRL_MODE_VELOCITY_CONTROL
+
+odrv0.axis1.motor.config.calibration_current = 40
+odrv0.axis1.motor.config.current_lim = 90
+odrv0.axis1.encoder.config.calib_range = 0.05
+odrv0.axis1.motor.config.pole_pairs = 10
+odrv0.axis1.encoder.config.cpr = 60
+odrv0.axis1.motor.config.resistance_calib_max_voltage = 4
+odrv0.axis1.motor.config.requested_current_range = 60
+odrv0.axis1.motor.config.inverter_temp_limit_upper = 170.0
+odrv0.axis1.motor.config.current_control_bandwidth = 1000
+odrv0.axis1.encoder.config.mode = ENCODER_MODE_HALL
+odrv0.axis1.encoder.config.bandwidth = 100
+odrv0.axis1.controller.config.pos_gain = 5
+odrv0.axis1.controller.config.vel_gain = 0.2
+odrv0.axis1.controller.config.vel_integrator_gain = 0.1
+odrv0.axis1.controller.config.vel_limit = 1000
+odrv0.axis1.controller.config.vel_ramp_rate = 1032.0
+odrv0.axis1.controller.config.control_mode = CTRL_MODE_VELOCITY_CONTROL
+
+odrv0.save_configuration()
+odrv0.reboot()
+
+odrv0.axis0.requested_state = AXIS_STATE_MOTOR_CALIBRATION
+odrv0.axis0.motor.config.pre_calibrated = True
+odrv0.axis0.requested_state = AXIS_STATE_ENCODER_OFFSET_CALIBRATION
+odrv0.axis0.encoder
+odrv0.axis0.encoder.config.pre_calibrated = True
+
+odrv0.axis1.requested_state = AXIS_STATE_MOTOR_CALIBRATION
+odrv0.axis1.motor.config.pre_calibrated = True
+odrv0.axis1.requested_state = AXIS_STATE_ENCODER_OFFSET_CALIBRATION
+odrv0.axis1.encoder
+odrv0.axis1.encoder.config.pre_calibrated = True
+
+odrv0.save_configuration()
+odrv0.reboot()
+
+odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+odrv0.axis0.controller.vel_setpoint = 300
+odrv0.axis1.controller.vel_setpoint = 200
+
+dump_errors(odrv0)
+
+odrv0.erase_configuration()
+
