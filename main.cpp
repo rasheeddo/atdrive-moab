@@ -184,10 +184,25 @@ void set_mode_manual() {
 	//u_printf("manual motor: %f %f\n", leftRPM, rightRPM);
 	drive.setRPMs(rightRPM, leftRPM);
 	*/
-	drive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
-	drive.setRPMs(motorRPM[0],motorRPM[1]);
+#ifdef _KO_PROPO
+	sbus_a_forImuPacket = sbup.ch2;
+	sbus_b_forImuPacket = sbup.ch3;
+	drive.vehicleControl(sbup.ch3, sbup.ch2, motorRPM);
+#endif
+
+#ifdef _LTE_PROPO
+	sbus_a_forImuPacket = sbup.ch1;
+	sbus_b_forImuPacket = sbup.ch2;
+	drive.vehicleControl(sbup.ch2, sbup.ch1, motorRPM);
+#endif
+
+#ifdef _FUTABA
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
+	drive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
+#endif
+
+	drive.setRPMs(motorRPM[0],motorRPM[1]);
 }
 
 void set_mode_auto() {
@@ -234,6 +249,20 @@ void sbus_reTx_worker() {
 
 	uint32_t flags_read;
 
+#ifdef _KO_PROPO
+	bool stop_trig = false;
+#endif
+
+#ifdef _LTE_PROPO
+	bool man_lock = true;
+	bool stop_lock = false;
+	bool auto_lock= false;
+#endif
+
+#ifdef _FUTABA
+	
+#endif
+
 	while (true) {
 		flags_read = event_flags.wait_any(_EVENT_FLAG_SBUS, 100);
 
@@ -245,6 +274,53 @@ void sbus_reTx_worker() {
 			u_printf("S.Bus failsafe!\n");
 			set_mode_sbus_failsafe();
 		} else {
+
+#ifdef _KO_PROPO
+
+			if (sbup.ch7 < 1050 && sbup.ch7 > 950 && sbup.ch8 < 1050 && sbup.ch8 > 950 && sbup.ch6 < 1500 && !stop_trig) {
+				set_mode_manual();
+			} else if (sbup.ch7 > 1050 && sbup.ch7 < 1100 && sbup.ch8 > 1050 && sbup.ch8 < 1100 && sbup.ch6 < 1500 && !stop_trig) {
+				set_mode_auto();
+			} else {
+				set_mode_stop();
+				if (sbup.ch5 > 1500){
+					stop_trig = false;
+				} else {
+					stop_trig = true;
+				}
+			}
+#endif
+
+#ifdef _LTE_PROPO
+			if (sbup.ch8 > 1024 || sbup.ch7 > 1024 || stop_lock == true && ((sbup.ch5 < 1024) && (sbup.ch6 < 1024)) ) {
+				
+				set_mode_stop();
+				man_lock = false;
+				stop_lock = true;
+				auto_lock = false;
+				//u_printf("stop_mode");
+
+			} else if (sbup.ch5 > 1024 || man_lock == true && !(sbup.ch6 > 1024)) {
+				
+				set_mode_manual();
+				man_lock = true;
+				stop_lock = false;
+				auto_lock = false;
+				//u_printf("manual_mode");
+
+			} else if (sbup.ch6 > 1024 || auto_lock == true){
+				set_mode_auto();
+				man_lock = false;
+				stop_lock = false;
+				auto_lock= true;
+				//u_printf("auto_mode");
+			}
+			else{
+				u_printf("none_mode");
+			}
+#endif
+
+#ifdef _FUTABA
 			if (sbup.ch5 < 688) {
 				set_mode_stop();
 			} else if (sbup.ch5 < 1360) {
@@ -252,7 +328,7 @@ void sbus_reTx_worker() {
 			} else {
 				set_mode_auto();
 			}
-
+#endif
 		}
 		int retval = tx_sock.sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_SBUS,
 				(char *) &sbup, sizeof(struct sbus_udp_payload));

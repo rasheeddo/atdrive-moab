@@ -3,6 +3,7 @@
 
 #include "mbed.h"
 #include "rtos.h"
+#include "ROBOT_CONFIG.hpp"
 
 class XWheels
 {
@@ -20,7 +21,38 @@ class XWheels
 
         void vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]);
         // vehcileControl: Convert the stick value to motor's RPM value and pass it to DriveWheels function
+#ifdef _KO_PROPO
 
+        int MIN_STICK = 430;     
+        int MAX_STICK = 1600;    
+
+        int MIN_DEADBAND = 999;
+        int MAX_DEADBAND = 1019;
+
+        int MID_STICK = 1009;
+        int DIVIDER = 2;           // a divider of another wheel's speed, e.g. 2 is half speed of the another wheel's speed
+
+        float MAX_RPM = 144.0;
+        float ZERO_RPM = 0.0;
+
+#endif
+
+#ifdef _LTE_PROPO
+
+        int MIN_STICK = 283;     
+        int MAX_STICK = 1758;    
+
+        int MIN_DEADBAND = 924;
+        int MAX_DEADBAND = 1124;
+
+        int MID_STICK = 1024;
+        int DIVIDER = 2;           // a divider of another wheel's speed, e.g. 2 is half speed of the another wheel's speed
+
+        float MAX_RPM = 60.0;
+        float ZERO_RPM = 0.0;  //1.4720
+#endif
+
+#ifdef _FUTABA
 
         int MIN_STICK = 360;       
         int MAX_STICK = 1673;      
@@ -41,7 +73,11 @@ class XWheels
 
                                        // 1.472 for Yorii UGV
                                        // 0.0 for ATCart test-ugv  there is no problem with this one
-            
+#endif
+
+        
+ 
+
     private:
         
         PinName _tx_pin;

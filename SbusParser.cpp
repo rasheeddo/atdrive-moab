@@ -12,7 +12,7 @@ SbusParser::SbusParser(struct sbus_udp_payload *sup) {
 
 //int missedChars = 0;
 int SbusParser::_processSbusMessage() {
-
+	/*
 	switch (_rxBuf[23]) {
 	// my transmitter always has 1 of these 4 bytes:
 	case 0x04:
@@ -23,7 +23,7 @@ int SbusParser::_processSbusMessage() {
 	default:
 		//return _rxBuf[23];
 		return -1;
-	}
+	}*/
 
 	_sup->ch1 =   _rxBuf[0]			   | ((_rxBuf[1] & 0x07) << 8);
 	_sup->ch2 = ((_rxBuf[1] & 0xf8) >> 3) | ((_rxBuf[2] & 0x3f) << 5);
