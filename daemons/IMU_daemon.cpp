@@ -95,7 +95,11 @@ void IMU_daemon::main_worker() {
 
 			if (retval == 22) {
 				_mData.sbus_a = *_sbus_a;
+<<<<<<< HEAD
 				_mData.sbus_b = *_sbus_b; 
+=======
+				_mData.sbus_b = *_sbus_b;
+>>>>>>> 9da12216376d57c59cec19a4e53cc6f874906460
 
 #ifdef _TWO_SHAFT_ENCODERS
 				_mData.shaft_a_pps = shaft_a.get_pps();
