@@ -27,8 +27,8 @@
 
 #include "SbusParser.hpp"
 //#include "MotorControl.hpp"
-#include "XWheels.hpp"
-
+//#include "XWheels.hpp"
+#include "odrive.hpp"
 
 EventFlags event_flags;
 
@@ -49,7 +49,7 @@ PwmOut hb_led(PA_6);
 DigitalOut myledR(LED3, 0);
 DigitalOut myledG(LED1, 0);
 DigitalOut myledB(LED2, 0);
-
+DigitalOut velocityModeLED(PC_7, 0);
 
 
 uint16_t sbus_a_forImuPacket = 0;
@@ -68,8 +68,9 @@ PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
 
 // Motors:
 //MotorControl motorControl(PD_14, PD_15);
-XWheels drive(PD_1, PD_0);
-float motorRPM[2];
+//XWheels drive(PD_1, PD_0);
+//float motorRPM[2];
+ODrive odrive(PD_1,PD_0, &tx_sock);
 
 // S.Bus is 100000Hz, 8E2, electrically inverted
 RawSerial sbus_in(NC, PD_2, 100000);  // tx, then rx
@@ -96,44 +97,74 @@ void u_printf(const char *fmt, ...) {
 //uint16_t auto_ch1 = 1024;
 //uint16_t auto_ch2 = 1024;
 float rpmR;
-float rpmL; 
+float rpmL;
+
+////////////// ODrive related parameters ///////////////////
+uint32_t des_com_mode;  // desired command mode from autopilot script
+float motorRPM[2]; 		// pass by refenrece to odrive method
+float degR; 			// for ODrive used (position control)
+float degL; 			// for ODrive used (position control)
+float motorDEG[2]; 		// pass by refenrece to odrive method
+float initDeg[2];		
+float reported_RPMs[2];
+float reported_DEGs[2];
+int reported_odrive_mode;
+
 void udp_rx_worker() {
 	/*
 	 * Here we receive throttle and steering control from the auto-pilot computer
 	 */
 	SocketAddress sockAddr;
-	char inputBuffer[33];
-	inputBuffer[32] = 0;
+	// for Odrive, there are (mode, rpmR, rpmL) that we will receive from autopilot script
+	char inputBuffer[96];		//char inputBuffer[33];
+	inputBuffer[95] = 0; 		//inputBuffer[32] = 0;
 	uint64_t _last_autopilot = 0;
+
 	float *control = (float *) &(inputBuffer[0]);
-	//uint16_t *control = (uint16_t *) &(inputBuffer[0]);
 
 	rx_sock.set_blocking(true);
 	rx_sock.set_timeout(500);
 
 	while (true) {
 
-		int n = rx_sock.recvfrom(&sockAddr, inputBuffer, 64);
+		int n = rx_sock.recvfrom(&sockAddr, inputBuffer, 96);
 		uint64_t ts = rtos::Kernel::get_ms_count();
 		if (ts - _last_autopilot > 500) {
 			if (rpmR != 0.0 || rpmL != 0.0) {
 				u_printf("Timeout: resetting auto sbus values\n");
-				rpmR = drive.ZERO_RPM;		//auto_ch1 = 1024;
-				rpmL = drive.ZERO_RPM;		//auto_ch2 = 1024;
+				//auto_ch1 = 1024;
+				//auto_ch2 = 1024;
+				rpmR = 0.0;
+				rpmL = 0.0;
+				degR = 0.0;
+				degL = 0.0;
 			}
 		}
-
-		if (n == 2*sizeof(float)) {
+			//n == 2*sizeof(float)
+		if (n == 3*sizeof(float)) {
 			_last_autopilot = ts;
-			rpmR = control[0];		//auto_ch1 = control[0];
-			rpmL = control[1];		//auto_ch2 = control[1];	
+			//auto_ch1 = control[0];
+			//auto_ch2 = control[1];
+
+			des_com_mode = (uint32_t)control[0];
+			
+			if (des_com_mode == 2.0){
+				rpmR = control[1];
+				rpmL = control[2];
+			}
+			else if (des_com_mode == 3.0){
+				degR = control[1];
+				degL = control[2];
+			}
+			//u_printf("des_com_mode: %d  R:%f  L:%f \n", des_com_mode,control[1],control[2]);
+			
 		} else if (n > 0) {
 			inputBuffer[n] = 0;
 			printf("rx %d bytes:\r\n", n);
 			printf(inputBuffer);
 			printf("\r\n");
 		} else {
-			//printf("empty packet\r\n");
+			//printf("empty packet\n");
 		}
 	}
 }
@@ -151,7 +182,9 @@ void set_mode_sbus_failsafe() {
 
 	//motorControl.set_steering(1024);
 	//motorControl.set_throttle(352);
-	drive.setRPMs(drive.ZERO_RPM, drive.ZERO_RPM);
+	//drive.setRPMs(drive.ZERO_RPM, drive.ZERO_RPM);
+	odrive.set_RPMs(0.0,0.0);
+
 	sbus_a_forImuPacket = 1024;
 	sbus_b_forImuPacket = 352;
 }
@@ -163,7 +196,9 @@ void set_mode_stop() {
 
 	//motorControl.set_steering(sbup.ch1);
 	//motorControl.set_throttle(352);
-	drive.setRPMs(drive.ZERO_RPM, drive.ZERO_RPM);
+	//drive.setRPMs(drive.ZERO_RPM, drive.ZERO_RPM);
+	odrive.set_RPMs(0.0,0.0);
+
 	sbus_a_forImuPacket = 1024;
 	sbus_b_forImuPacket = 352;
 }
@@ -184,8 +219,31 @@ void set_mode_manual() {
 	//u_printf("manual motor: %f %f\n", leftRPM, rightRPM);
 	drive.setRPMs(rightRPM, leftRPM);
 	*/
-	drive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
-	drive.setRPMs(motorRPM[0],motorRPM[1]);
+	//drive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
+	//drive.setRPMs(motorRPM[0],motorRPM[1]);
+	if (reported_odrive_mode == 2){
+		//this LED is next to the hb_led, 1 means VELOCITY CONTROL
+		velocityModeLED = 1; 
+		odrive.vehicle_control(sbup.ch2, sbup.ch4, motorRPM);
+		odrive.set_RPMs(motorRPM[0], motorRPM[1]);
+		//u_printf("rpmR: %f   rpmL: %f\n", motorRPM[0], motorRPM[1]);
+		//odrive.get_reported_RPMs(reported_RPMs);
+		
+	}
+	else if (reported_odrive_mode == 3){
+		//this LED is next to the hb_led, 0 means POSITION CONTROL
+		velocityModeLED = 0; 
+		// when we changed the mode from vel to pos and reset, the value of position doesn't reset
+		// so we need to read the initial value for an offset of zero degree
+		odrive.get_started_DEGs(initDeg);
+		// we also input initDeg to use it as an offset (like starting point reference)
+		odrive.vehicle_angle_control(sbup.ch2, sbup.ch4, motorDEG, initDeg);
+		odrive.set_DEGs(motorDEG[0],motorDEG[1]);
+		//odrive.get_reported_DEGs(reported_DEGs);
+	}
+	else{
+		u_printf("...something wrong in manual mode\n");
+	}
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
 }
@@ -206,7 +264,29 @@ void set_mode_auto() {
 	//u_printf("auto motor: %f %f\n", leftRPM, rightRPM);
 	drive.setRPMs(rightRPM, leftRPM);
 	*/
-	drive.setRPMs(rpmR,rpmL);
+	//drive.setRPMs(rpmR,rpmL);
+	if (reported_odrive_mode == 2){
+		velocityModeLED = 1; //this LED is next to the hb_led, 1 means VELOCITY CONTROL
+
+		// In case changed the direction of UGV
+		if (odrive.THOTsign > 0.0){
+			odrive.set_RPMs(odrive.THOTsign*rpmR, -odrive.THOTsign*rpmL);       //odrive.set_RPMs(-rpmR, rpmL);
+		}
+		else{
+			odrive.set_RPMs(odrive.THOTsign*rpmL, -odrive.THOTsign*rpmR);       //odrive.set_RPMs(-rpmR, rpmL);
+		}
+		//odrive.get_reported_RPMs(reported_RPMs);
+	}
+	else if (reported_odrive_mode == 3){
+		velocityModeLED = 0; //this LED is next to the hb_led, 0 means POSITION CONTROL
+		odrive.get_started_DEGs(initDeg);
+		odrive.set_DEGs((-degR+initDeg[0]),(-degL+initDeg[1]));
+		//odrive.get_reported_DEGs(reported_DEGs);
+
+	}
+	else{
+		u_printf("...something wrong in automode\n");
+	}
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
 }
@@ -233,6 +313,8 @@ void Sbus_Rx_Interrupt() {
 void sbus_reTx_worker() {
 
 	uint32_t flags_read;
+	bool inter_lock_man = true;
+	bool inter_lock_auto = true;
 
 	while (true) {
 		flags_read = event_flags.wait_any(_EVENT_FLAG_SBUS, 100);
@@ -245,20 +327,46 @@ void sbus_reTx_worker() {
 			u_printf("S.Bus failsafe!\n");
 			set_mode_sbus_failsafe();
 		} else {
+
+			reported_odrive_mode = odrive.get_reported_mode();
+
 			if (sbup.ch5 < 688) {
 				set_mode_stop();
-			} else if (sbup.ch5 < 1360) {
+			} 
+			else if (sbup.ch5 < 1360) {
+				
+				// This condition below is to check and to change controller mode (in MANUAL case)//
+				if ((sbup.ch9 > 1500) && inter_lock_man) {
+
+					// send a trig to let odrive thread knows there is some mode-change request
+					odrive.mode_trigger(true);
+					inter_lock_man = false;
+				}
 				set_mode_manual();
-			} else {
-				set_mode_auto();
+
+			} 
+			else {
+
+				if ((des_com_mode != 0) && (reported_odrive_mode != 0)){
+
+					if ((reported_odrive_mode != des_com_mode) && inter_lock_auto) {
+						
+						// similar to manual, this will send a trig to odrive thread
+						odrive.mode_trigger(true);
+						inter_lock_auto = false;
+					}
+
+					set_mode_auto();
+				}
+	
 			}
 
-		}
-		int retval = tx_sock.sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_SBUS,
-				(char *) &sbup, sizeof(struct sbus_udp_payload));
+			int retval = tx_sock.sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_SBUS,
+					(char *) &sbup, sizeof(struct sbus_udp_payload));
 
-		if (retval < 0 && NETWORK_IS_UP) {
-			printf("UDP socket error in sbus_reTx_worker\r\n");
+			if (retval < 0 && NETWORK_IS_UP) {
+				printf("UDP socket error in sbus_reTx_worker\r\n");
+			}
 		}
 	}
 }
@@ -347,11 +455,11 @@ int main() {
 	imu_daemon.Start();  // will start a separate thread
 	gps_daemon.Start();  // will start a separate thread
 	//rtcm3_daemon.Start();  // will start a separate thread
-	pushButton_daemon.Start();  // will start a separate thread
+	//pushButton_daemon.Start();  // will start a separate thread
 
 
-	drive.Start(); // will start a separate thread
-
+	//drive.Start(); // will start a separate thread
+	odrive.Start();
 
 	hb_led.period(0.02);
 	hb_led.write(0.0);
@@ -392,4 +500,3 @@ int main() {
 	net.disconnect();
 	return 0;
 }
-

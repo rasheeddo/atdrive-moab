@@ -71,7 +71,8 @@ void IMU_daemon::main_worker() {
 
 	int count = 0;
 	while (true) {
-		ThisThread::sleep_for(10); // 100Hz
+		//ThisThread::sleep_for(10); // 100Hz // This delay was slowing down odrive thread
+										     // I think it might have some effect on serial port, not sure though
 
 		// Check the external compass at 20 Hz:
 		if (count % 5 == 0) {
