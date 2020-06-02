@@ -9,7 +9,7 @@ The step below is for
 
 For a professional user such as ARM developer, Software developer, or High experienced software engineer, please feel free to do it your own way for an installation and build process, and just skip to User Guide section.
 
-The master version of this repo is coded for XWheels (Brushless hub wheels) with a skid-mode type,for the steering type please check on [Mark's repo](https://github.com/mfassler/atdrive-moab).
+The default branch of this repo is coded for XWheels (Brushless hub wheels) with a skid-mode type,for the steering type please check on master branch of [Mark's repo](https://github.com/mfassler/atdrive-moab).
 
 The purpose of this project is to create a UGV controller which has an IO for low-level communication such as SBUS, GPS, RC-servo, etc., and Ethernet for high-level communication to an autopilot PC such as Intel NUC, NVIDIA Jetson, etc. Those autopilot PC will take care on Autopilot script, Navigation system, and AI integration.
 
