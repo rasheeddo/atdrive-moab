@@ -8,6 +8,10 @@
 //#define _AUTOPILOT_IP_ADDRESS "192.168.8.162"
 #define _AUTOPILOT_IP_ADDRESS "192.168.8.185"
 
+#define _LTE_PROPO
+//#define _KO_PROPO
+//#define _FUTABA
+
 #define _STEERING_PW_CENTER 0.001424
 #define _STEERING_PW_RANGE 0.000391
 
