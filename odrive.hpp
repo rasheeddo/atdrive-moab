@@ -115,8 +115,11 @@ class ODrive {
         int _Axis0_mode;
         int _Axis1_mode;
         float cpr = 839.16;   //258.0 for small wheels  839.16 for big wheels
+
+#ifdef _FUTABA        
         float MAX_RPM = 110.0;  //200.0 for small wheels  1110.0 for big wheels // Max RPM of the wheels, this is limited by wheels itself. Default is 144
         float ZERO_RPM = 0.0;          // No speed
+        
         int MIN_STICK = 360;       
         int MAX_STICK = 1673;     
 
@@ -124,6 +127,22 @@ class ODrive {
         int MAX_DEADBAND = 1034;
 
         int MID_STICK = 1024;
+#endif
+
+#ifdef _LTE_PROPO
+
+        float MAX_RPM = 80.0;
+        float ZERO_RPM = 0.0;
+
+        int MIN_STICK = 283;     
+        int MAX_STICK = 1758;    
+
+        int MIN_DEADBAND = 924;
+        int MAX_DEADBAND = 1124;
+
+        int MID_STICK = 1024;
+#endif
+        
         int DIVIDER = 2;           // a divider of another wheel's speed, e.g. 2 is half speed of the another wheel's speed
 
         float R_wheel = 0.15;    // small wheel 10.34cm, big wheel 15cm  

@@ -7,4 +7,11 @@
 #define _BROADCAST_IP_ADDRESS "192.168.0.255"
 #define _AUTOPILOT_IP_ADDRESS "192.168.0.126"
 
+#define _LTE_PROPO
+//#define _KO_PROPO
+//#define _FUTABA
+
+#define _STEERING_PW_CENTER 0.001424
+#define _STEERING_PW_RANGE 0.000391
+
 #endif // __ROBOT__CONFIG__HPP

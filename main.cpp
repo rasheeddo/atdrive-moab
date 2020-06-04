@@ -207,20 +207,8 @@ void set_mode_manual() {
 	myledR = 0;
 	myledG = 1;
 	myledB = 0;
-	/*
-	float leftWheel = 0;
-	float rightWheel = 0;
 
-	calc_sbus_to_skid_mode(sbup.ch1, sbup.ch3, &leftWheel, &rightWheel);
-
-	float leftRPM = 144 * leftWheel;
-	float rightRPM = 144 * rightWheel;
-
-	//u_printf("manual motor: %f %f\n", leftRPM, rightRPM);
-	drive.setRPMs(rightRPM, leftRPM);
-	*/
-	//drive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
-	//drive.setRPMs(motorRPM[0],motorRPM[1]);
+#ifdef _FUTABA
 	if (reported_odrive_mode == 2){
 		//this LED is next to the hb_led, 1 means VELOCITY CONTROL
 		velocityModeLED = 1; 
@@ -246,25 +234,33 @@ void set_mode_manual() {
 	}
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
+#endif
+
+#ifdef _LTE_PROPO
+	velocityModeLED = 1; 
+	if (reported_odrive_mode == 2){
+		odrive.vehicle_control(sbup.ch2, sbup.ch1, motorRPM);
+		odrive.set_RPMs(motorRPM[0], motorRPM[1]);
+	}
+	else{
+		u_printf("...something wrong in manual mode\n");
+	}
+	
+	// right now, only velocity control
+
+	sbus_a_forImuPacket = sbup.ch1;
+	sbus_b_forImuPacket = sbup.ch2;
+#endif
+
+
 }
 
 void set_mode_auto() {
 	myledR = 0;
 	myledG = 0;
 	myledB = 1;
-	/*
-	float leftWheel = 0;
-	float rightWheel = 0;
 
-	calc_sbus_to_skid_mode(auto_ch1, auto_ch2, &leftWheel, &rightWheel);
-
-	float leftRPM = 144 * leftWheel;
-	float rightRPM = 144 * rightWheel;
-
-	//u_printf("auto motor: %f %f\n", leftRPM, rightRPM);
-	drive.setRPMs(rightRPM, leftRPM);
-	*/
-	//drive.setRPMs(rpmR,rpmL);
+#ifdef _FUTABA
 	if (reported_odrive_mode == 2){
 		velocityModeLED = 1; //this LED is next to the hb_led, 1 means VELOCITY CONTROL
 
@@ -289,6 +285,27 @@ void set_mode_auto() {
 	}
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
+#endif
+
+#ifdef _LTE_PROPO
+	if (reported_odrive_mode == 2){
+		velocityModeLED = 1; 
+		// In case changed the direction of UGV
+		if (odrive.THOTsign > 0.0){
+			odrive.set_RPMs(odrive.THOTsign*rpmR, -odrive.THOTsign*rpmL);       //odrive.set_RPMs(-rpmR, rpmL);
+		}
+		else{
+			odrive.set_RPMs(odrive.THOTsign*rpmL, -odrive.THOTsign*rpmR);       //odrive.set_RPMs(-rpmR, rpmL);
+		}
+		
+	}
+	else{
+		u_printf("...something wrong in automode\n");
+	}
+	sbus_a_forImuPacket = sbup.ch1;
+	sbus_b_forImuPacket = sbup.ch2;
+#endif
+
 }
 
 
@@ -313,8 +330,15 @@ void Sbus_Rx_Interrupt() {
 void sbus_reTx_worker() {
 
 	uint32_t flags_read;
+#ifdef _FUTABA
 	bool inter_lock_man = true;
 	bool inter_lock_auto = true;
+#endif
+#ifdef _LTE_PROPO
+	bool man_lock = true;
+	bool stop_lock = false;
+	bool auto_lock= false;
+#endif
 
 	while (true) {
 		flags_read = event_flags.wait_any(_EVENT_FLAG_SBUS, 100);
@@ -330,6 +354,8 @@ void sbus_reTx_worker() {
 
 			reported_odrive_mode = odrive.get_reported_mode();
 
+#ifdef _FUTABA
+		
 			if (sbup.ch5 < 688) {
 				set_mode_stop();
 			} 
@@ -360,6 +386,36 @@ void sbus_reTx_worker() {
 				}
 	
 			}
+#endif
+
+#ifdef _LTE_PROPO
+			if (sbup.ch8 > 1024 || sbup.ch7 > 1024 || stop_lock == true && ((sbup.ch5 < 1024) && (sbup.ch6 < 1024)) ) {
+				
+				set_mode_stop();
+				man_lock = false;
+				stop_lock = true;
+				auto_lock = false;
+				//u_printf("stop_mode");
+
+			} else if (sbup.ch5 > 1024 || man_lock == true && !(sbup.ch6 > 1024)) {
+				
+				set_mode_manual();
+				man_lock = true;
+				stop_lock = false;
+				auto_lock = false;
+				//u_printf("manual_mode");
+
+			} else if (sbup.ch6 > 1024 || auto_lock == true){
+				set_mode_auto();
+				man_lock = false;
+				stop_lock = false;
+				auto_lock= true;
+				//u_printf("auto_mode");
+			}
+			else{
+				u_printf("none_mode");
+			}
+#endif
 
 			int retval = tx_sock.sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_SBUS,
 					(char *) &sbup, sizeof(struct sbus_udp_payload));
