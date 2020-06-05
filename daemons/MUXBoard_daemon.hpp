@@ -65,9 +65,9 @@ class MUXBoard_daemon {
 
 		Thread main_thread;
 
-		std::string readString_battMonitor();
-
 		void main_worker();
+        
+        void Rx_Interrupt();
 
 		void recvBatteryInfo(char *cstr, uint8_t ch);
 
