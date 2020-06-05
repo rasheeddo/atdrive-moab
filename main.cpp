@@ -24,7 +24,7 @@
 #include "daemons/GPS_daemon.hpp"
 #include "daemons/RTCM3_daemon.hpp"
 #include "daemons/PushButton_daemon.hpp"
-
+#include "daemons/MUXBoard_daemon.hpp"
 #include "SbusParser.hpp"
 //#include "MotorControl.hpp"
 #include "XWheels.hpp"
@@ -64,7 +64,7 @@ IMU_daemon imu_daemon(&tx_sock, &sbus_a_forImuPacket, &sbus_b_forImuPacket);
 GPS_daemon gps_daemon(PE_8, PE_7, &net);
 //RTCM3_daemon rtcm3_daemon(PD_5, PD_6, &tx_sock);
 PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
-
+MUXBoard_daemon mux_daemon(PD_5, PD_6, &tx_sock);
 
 // Motors:
 //MotorControl motorControl(PD_14, PD_15);
@@ -424,9 +424,10 @@ int main() {
 	gps_daemon.Start();  // will start a separate thread
 	//rtcm3_daemon.Start();  // will start a separate thread
 	pushButton_daemon.Start();  // will start a separate thread
-
+	mux_daemon.Start();
 
 	drive.Start(); // will start a separate thread
+
 
 
 	hb_led.period(0.02);
