@@ -100,7 +100,7 @@ void XWheels::main_worker() {
 	// previously it was 1000ms but I changed it to a bit longer
     // seem like when the wheels are in ESC error situation, and we resest it again (by NVIC_SystemReset)
     // when it comes back, it will become able to work faster than than small delay
-    ThisThread::sleep_for(2000);
+    ThisThread::sleep_for(3000);
 
 	//u_printf("Trying to start XWheels...\n");
 
