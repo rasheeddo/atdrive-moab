@@ -24,10 +24,11 @@
 #include "daemons/GPS_daemon.hpp"
 #include "daemons/RTCM3_daemon.hpp"
 #include "daemons/PushButton_daemon.hpp"
-#include "daemons/MUXBoard_daemon.hpp"
+//#include "daemons/MUXBoard_daemon.hpp"
 #include "SbusParser.hpp"
 //#include "MotorControl.hpp"
-#include "XWheels.hpp"
+//#include "XWheels.hpp"
+#include "VESC.hpp"
 
 
 EventFlags event_flags;
@@ -64,11 +65,12 @@ IMU_daemon imu_daemon(&tx_sock, &sbus_a_forImuPacket, &sbus_b_forImuPacket);
 GPS_daemon gps_daemon(PE_8, PE_7, &net);
 //RTCM3_daemon rtcm3_daemon(PD_5, PD_6, &tx_sock);
 PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
-MUXBoard_daemon mux_daemon(PD_5, PD_6, &tx_sock);
+//MUXBoard_daemon mux_daemon(PD_5, PD_6, &tx_sock);
 
 // Motors:
 //MotorControl motorControl(PD_14, PD_15);
-XWheels drive(PD_1, PD_0);
+//XWheels drive(PD_1, PD_0);
+VESC vesc(&tx_sock);
 float motorRPM[2];
 
 // S.Bus is 100000Hz, 8E2, electrically inverted
@@ -118,8 +120,8 @@ void udp_rx_worker() {
 		if (ts - _last_autopilot > 500) {
 			if (rpmR != 0.0 || rpmL != 0.0) {
 				u_printf("Timeout: resetting auto sbus values\n");
-				rpmR = drive.ZERO_RPM;		//auto_ch1 = 1024;
-				rpmL = drive.ZERO_RPM;		//auto_ch2 = 1024;
+				rpmR = vesc.ZERO_RPM;		//auto_ch1 = 1024;
+				rpmL = vesc.ZERO_RPM;		//auto_ch2 = 1024;
 			}
 		}
 
@@ -151,7 +153,7 @@ void set_mode_sbus_failsafe() {
 
 	//motorControl.set_steering(1024);
 	//motorControl.set_throttle(352);
-	drive.setRPMs(drive.ZERO_RPM, drive.ZERO_RPM);
+	vesc.setRPMs(vesc.ZERO_RPM, vesc.ZERO_RPM);
 	sbus_a_forImuPacket = 1024;
 	sbus_b_forImuPacket = 352;
 }
@@ -163,7 +165,7 @@ void set_mode_stop() {
 
 	//motorControl.set_steering(sbup.ch1);
 	//motorControl.set_throttle(352);
-	drive.setRPMs(drive.ZERO_RPM, drive.ZERO_RPM);
+	vesc.setRPMs(vesc.ZERO_RPM, vesc.ZERO_RPM);
 	sbus_a_forImuPacket = 1024;
 	sbus_b_forImuPacket = 352;
 }
@@ -187,22 +189,22 @@ void set_mode_manual() {
 #ifdef _KO_PROPO
 	sbus_a_forImuPacket = sbup.ch2;
 	sbus_b_forImuPacket = sbup.ch3;
-	drive.vehicleControl(sbup.ch3, sbup.ch2, motorRPM);
+	vesc.vehicleControl(sbup.ch3, sbup.ch2, motorRPM);
 #endif
 
 #ifdef _LTE_PROPO
 	sbus_a_forImuPacket = sbup.ch1;
 	sbus_b_forImuPacket = sbup.ch2;
-	drive.vehicleControl(sbup.ch2, sbup.ch1, motorRPM);
+	vesc.vehicleControl(sbup.ch2, sbup.ch1, motorRPM);
 #endif
 
 #ifdef _FUTABA
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
-	drive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
+	vesc.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
 #endif
 
-	drive.setRPMs(motorRPM[0],motorRPM[1]);
+	vesc.setRPMs(motorRPM[0],motorRPM[1]);
 }
 
 void set_mode_auto() {
@@ -221,7 +223,7 @@ void set_mode_auto() {
 	//u_printf("auto motor: %f %f\n", leftRPM, rightRPM);
 	drive.setRPMs(rightRPM, leftRPM);
 	*/
-	drive.setRPMs(rpmR,rpmL);
+	vesc.setRPMs(rpmR,rpmL);
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
 }
@@ -424,10 +426,10 @@ int main() {
 	gps_daemon.Start();  // will start a separate thread
 	//rtcm3_daemon.Start();  // will start a separate thread
 	pushButton_daemon.Start();  // will start a separate thread
-	mux_daemon.Start();
+	//mux_daemon.Start();
 
-	drive.Start(); // will start a separate thread
-
+	//drive.Start(); // will start a separate thread
+	vesc.Start(); // will start a separate thread
 
 
 	hb_led.period(0.02);

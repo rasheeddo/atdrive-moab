@@ -18,6 +18,8 @@
 // not used anymore:
 //#define UDP_PORT_IMU_CONFIG 27115
 
+#define UDP_PORT_VESC 27116
+
 // RTCM3 messages from GPS module (broadcast):
 #define UDP_PORT_GPS_RTCM3 27117
 
