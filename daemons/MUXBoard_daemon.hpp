@@ -10,7 +10,7 @@
 #include <cstdlib>
 #include "ROBOT_CONFIG.hpp"
 #include "MOAB_DEFINITIONS.h"
-
+#include "platform/CircularBuffer.h"
 
 struct I2C_MUX_BOARD_COMMON_t{
     uint32_t current1;
@@ -43,7 +43,7 @@ struct I2C_MUX_BOARD_BATTINFO_t{
 	uint16_t TimeSpentinOT;
 };
 
-
+#define MUX_BUF_SIZE    128
 
 class MUXBoard_daemon {
 
@@ -57,6 +57,7 @@ class MUXBoard_daemon {
 
 		RawSerial *_bat_mon;
 		RawSerial *_usb_debug;
+        CircularBuffer<char, MUX_BUF_SIZE> *_rxbuf;
 
 		struct I2C_MUX_BOARD_COMMON_t I2C_MUX_BOARD_common;
 		struct I2C_MUX_BOARD_BATTINFO_t I2C_MUX_BOARD_BattInfo[6];

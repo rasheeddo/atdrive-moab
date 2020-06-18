@@ -1,10 +1,6 @@
 
 #include "MUXBoard_daemon.hpp"
 
-volatile static uint8_t _flag_rcevData = 0;
-volatile static uint8_t _len=0;
-volatile static char response_tmp[128];
-volatile static char response[128];
 
 extern void u_printf(const char *fmt, ...);  // Defined in main()
 
@@ -13,31 +9,16 @@ MUXBoard_daemon::MUXBoard_daemon(PinName tx, PinName rx, UDPSocket *tx_sock) {
 	
 	_bat_mon = new RawSerial(tx, rx, 115200);  //tx, then rx
 	_usb_debug = new RawSerial(USBTX,USBRX,115200);
-
+    _rxbuf = new CircularBuffer<char, MUX_BUF_SIZE>;
 	_sock = tx_sock;
 }
 
 void MUXBoard_daemon::Rx_Interrupt(){
     char c;
-
     while (_bat_mon->readable()) {
         c = _bat_mon->getc();
-
-        response_tmp[_len] = c;
-        if (c == '\n'){
-            memset((char *)response,0,sizeof(response));
-            memcpy((char *)response,(char *)response_tmp,_len);
-            _len = 0;
-            _flag_rcevData = 1;
-            recvInfo();
-        }
-        else{
-            if(_len > 128){
-                _len = 0;
-            }
-            else{
-                _len++;
-            }
+        if(_rxbuf->full() == false){
+            _rxbuf->push(c);
         }
     }    
 }
@@ -49,42 +30,91 @@ void MUXBoard_daemon::Start() {
 
 void MUXBoard_daemon::main_worker() {
 
-    static uint8_t noResponceCount = 0;
+    uint8_t noResponceCount = 0;
+    uint8_t state = 0;
+    uint8_t f_waitRcev = 0;
+    uint8_t printCount = 0;
 
 	ThisThread::sleep_for(1000);
     _bat_mon->attach(callback(this, &MUXBoard_daemon::Rx_Interrupt));
 
+
 	while(1){
-        _bat_mon->puts("g current 1\n");
-        //u_printf("currentSensor1 = %.3f A\n", I2C_MUX_BOARD_common.current1/1000.0);
-        _usb_debug->printf("currentSensor1 = %.3f A\n", I2C_MUX_BOARD_common.current1/1000.0);
+        if(f_waitRcev){
+            switch(recvInfo()){
+                case 0:
+                    if(noResponceCount >= 10){
+                        _usb_debug->printf("MUX board no response!\n");
+                        noResponceCount = 0;
+                        f_waitRcev = 0;
+                    }
+                    else{
+                        noResponceCount++;
+                    }
+                    break;
+                case 1:
+                case -1:
+                    f_waitRcev = 0;
+                    noResponceCount = 0;
+                    break;
+            }
+        }
+        else {
+            switch(state){
+                case 0:
+                    _bat_mon->puts("g current 1\n");
+                    f_waitRcev = 1;
+                    break;
+                case 1:
+                    _bat_mon->puts("g current 2\n");
+                    f_waitRcev = 1;
+                    break;
+                case 2:
+                    _bat_mon->puts("g tmp 1\n");
+                    f_waitRcev = 1;
+                    break;
+                case 3:
+                    _bat_mon->puts("g tmp 2\n");
+                    f_waitRcev = 1;
+                    break;
+                case 4:
+                    _bat_mon->puts("g bat 1\n");
+                    f_waitRcev = 1;
+                    break;
+                case 5:
+                    _bat_mon->puts("g bat 5\n");
+                    f_waitRcev = 1;
+                    break;
+            }
+            if(++state>5){
+                state = 0;
+            }
+        }
 
-        _bat_mon->puts("g current 2\n");
-        //u_printf("currentSensor2 = %.3f A\n", I2C_MUX_BOARD_common.current2/1000.0);
-        _usb_debug->printf("currentSensor2 = %.3f A\n", I2C_MUX_BOARD_common.current2/1000.0);
+        if((++printCount)>10){
+            printCount = 0;
+            //u_printf("currentSensor1 = %.3f A\n", I2C_MUX_BOARD_common.current1/1000.0);
+            _usb_debug->printf("currentSensor1 = %.3f A\n", I2C_MUX_BOARD_common.current1/1000.0);
+            //u_printf("currentSensor2 = %.3f A\n", I2C_MUX_BOARD_common.current2/1000.0);
+            _usb_debug->printf("currentSensor2 = %.3f A\n", I2C_MUX_BOARD_common.current2/1000.0);
+            //u_printf("tmpSensor1 = %.2f degC\n", I2C_MUX_BOARD_common.tmp1/100.0);
+            _usb_debug->printf("tmpSensor1 = %.2f degC\n", I2C_MUX_BOARD_common.tmp1/100.0);
+            //u_printf("tmpSensor2 = %.2f degC\n", I2C_MUX_BOARD_common.tmp2/100.0);
+            _usb_debug->printf("tmpSensor2 = %.2f degC\n", I2C_MUX_BOARD_common.tmp2/100.0);       
+            _usb_debug->printf("BAT1 V:%d mV, I:%d mA, SOC:%d \n",
+            I2C_MUX_BOARD_BattInfo[0].volt,
+                I2C_MUX_BOARD_BattInfo[0].current,
+            I2C_MUX_BOARD_BattInfo[0].SOC);
+            _usb_debug->printf("BAT5 V:%d mV, I:%d mA, SOC:%d \n",
+            I2C_MUX_BOARD_BattInfo[4].volt,
+                I2C_MUX_BOARD_BattInfo[4].current,
+            I2C_MUX_BOARD_BattInfo[4].SOC);
+            _usb_debug->printf("\n");
+        }
 
-        _bat_mon->puts("g tmp 1\n");
-        //u_printf("tmpSensor1 = %.2f degC\n", I2C_MUX_BOARD_common.tmp1/100.0);
-		_usb_debug->printf("tmpSensor1 = %.2f degC\n", I2C_MUX_BOARD_common.tmp1/100.0);
-
-        _bat_mon->puts("g tmp 2\n");
-        //u_printf("tmpSensor2 = %.2f degC\n", I2C_MUX_BOARD_common.tmp2/100.0);
-		_usb_debug->printf("tmpSensor2 = %.2f degC\n", I2C_MUX_BOARD_common.tmp2/100.0);
-        
-        _bat_mon->puts("g bat 1\n");
-        _usb_debug->printf("BAT1 V:%d mV, I:%d mA, SOC:%d \n",
-           I2C_MUX_BOARD_BattInfo[0].volt,
-            I2C_MUX_BOARD_BattInfo[0].current,
-           I2C_MUX_BOARD_BattInfo[0].SOC);
-
-        _bat_mon->puts("g bat 5\n");
-        _usb_debug->printf("BAT5 V:%d mV, I:%d mA, SOC:%d \n",
-           I2C_MUX_BOARD_BattInfo[4].volt,
-            I2C_MUX_BOARD_BattInfo[4].current,
-           I2C_MUX_BOARD_BattInfo[4].SOC);
-
+#if 0
         if(_flag_rcevData == 0){
-            if(noResponceCount>=3){
+            if(noResponceCount>=30){
                 _usb_debug->printf("MUX board no response!\n");
             }
             else{
@@ -95,6 +125,7 @@ void MUXBoard_daemon::main_worker() {
             noResponceCount = 0;
             _flag_rcevData = 0;
         }
+#endif
         /*
         for(int i=1;i<=6;i++)
         {
@@ -117,8 +148,7 @@ void MUXBoard_daemon::main_worker() {
         }*/
 
         //u_printf("\n");
-        _usb_debug->printf("\n");
-        ThisThread::sleep_for(1000);
+        ThisThread::sleep_for(100);
 	}
 }
 
@@ -207,35 +237,62 @@ int8_t MUXBoard_daemon::recvInfo(void){
     char *strCmd;
     char *strCh;
     char *parseTargetStr;
+    char c;
     uint8_t ch;
+    uint8_t f_rcevData = 0;
 
-   	strCmd = strtok((char *)response, ",");
-    strCh = strtok(NULL, ",");
-    ch = atoi(strCh);
+    const static uint8_t response_size =128;
+    static uint8_t _len=0;
+    static char response[128];
 
-    if(strstr(strCmd,"batt") != NULL){
-        if( (ch >= 1) && (ch <= 6) ){
-            recvBatteryInfo(strCh+2,ch);
+    while(_rxbuf->empty() == false){
+        _rxbuf->pop(c);
+        if(c == '\n'){
+            response[_len] = '\0';
+            f_rcevData = 1;
+            _len = 0;
+            break;
+        }
+        else{
+            response[_len] = c;
+        }
+        if((++_len)>response_size){
+            _len = 0;
         }
     }
-    else if(strstr(strCmd,"tmp") != NULL){
-        if( (ch >= 1) && (ch <= 2) ){
-            recvTmpInfo(strCh+2,ch);
-        }
-    }
-    else if(strstr(strCmd,"current") != NULL){
-        if( (ch >= 1) && (ch <= 2) ){
-            recvCurrentInfo(strCh+2,ch);
-        }
-    }
-    else if(strstr(strCmd,"ERROR") != NULL){
-        _usb_debug->printf("error ditect\n");
-        u_printf("MUXBoard_daemon: error ditect\n");
-        return -1; 
-    }
-    else
-    {
 
+    if(f_rcevData){
+        f_rcevData = 0;
+
+        strCmd = strtok((char *)response, ",");
+        strCh = strtok(NULL, ",");
+        ch = atoi(strCh);
+
+        if(strstr(strCmd,"batt") != NULL){
+            if( (ch >= 1) && (ch <= 6) ){
+                recvBatteryInfo(strCh+2,ch);
+            }
+        }
+        else if(strstr(strCmd,"tmp") != NULL){
+            if( (ch >= 1) && (ch <= 2) ){
+                recvTmpInfo(strCh+2,ch);
+            }
+        }
+        else if(strstr(strCmd,"current") != NULL){
+            if( (ch >= 1) && (ch <= 2) ){
+                recvCurrentInfo(strCh+2,ch);
+            }
+        }
+        else if(strstr(strCmd,"ERROR") != NULL){
+            _usb_debug->printf("error ditect\n");
+            u_printf("MUXBoard_daemon: error ditect\n");
+            return -1; 
+        }
+        else
+        {
+
+        }
+        return 1;
     }
 
     return 0;
