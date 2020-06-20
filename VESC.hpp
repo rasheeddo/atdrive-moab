@@ -31,11 +31,16 @@ class VESC{
 
 	public:
 
+		//VESC(UDPSocket*, PinName, PinName);
 		VESC(UDPSocket*);
 
 		void Start();
 
+		// set speed of two wheels
 		void setRPMs(float , float);
+
+		// set speed of two wheels in case manual is true flag, auto is false flag
+		void setRPMs(float , float, bool);
 
 		void vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]);
 
@@ -54,8 +59,29 @@ class VESC{
         int DIVIDER = 2;           		// a divider of another wheel's speed, 
         								// e.g. 2 is half speed of the another wheel's speed
 
-        float MAX_RPM = 100.0;          // Max RPM of the wheels, this is limited by wheels itself.
-        float ZERO_RPM = 0.0;           // this may need to adjust according to each robot,
+        float MAX_RPM = 136.0;          // VESC is 100.0 in case of internal PID speed controller
+        							 	// Dual FSESC PID speed controller is not good,
+        							 	// so we use Duty Cycle control instead     
+        float ZERO_RPM = 0.0;           
+
+#endif
+
+#ifdef _LTE_PROPO
+
+        int MIN_STICK = 283;     
+        int MAX_STICK = 1758;    
+
+        int MIN_DEADBAND = 924;
+        int MAX_DEADBAND = 1124;
+
+        int MID_STICK = 1024;
+        int DIVIDER = 2;           		// a divider of another wheel's speed, 
+        								// e.g. 2 is half speed of the another wheel's speed
+
+        float MAX_RPM = 136.0;          // VESC is 100.0 in case of internal PID speed controller
+        							 	// Dual FSESC PID speed controller is not good,
+        							 	// so we use Duty Cycle control instead     
+        float ZERO_RPM = 0.0;           
 
 #endif
 
@@ -64,6 +90,11 @@ class VESC{
 
 		RawSerial *_usb_debug;
 		UDPSocket *_sock;
+
+		//PwmOut *_motor_A;
+		//PwmOut *_motor_B;
+
+		Timer _timer;
 
 		Thread main_thread;
 
@@ -75,15 +106,28 @@ class VESC{
 
 		float ERPM_TO_RPM(float erpm);
 
+		float RPM_TO_DUTY(float rpm);
+
 		float _rpmR;
 		float _rpmL;
+		bool _man_flag = true;
+
+		float _percentR;
+		float _percentL;
+
+		float MAX_DUTY = 1.0;
 
 		// each wheel has different EPRM values
 		float _ERPM_ratio = 140.0;   // for big wheels (XWheels's hub)  1 RPM -> 140 ERPM
 
-		float _MIN_PWM = 0.001000;  // 1000ms
+		float read_rpm0;
+		float read_rpm1;
+		float in_voltage0;
+		float in_voltage1;
+		float in_current0;
+		float in_current1;
 
-		float _MAX_PWM = 0.002000;  // 2000ms
+		float _period;
 
 
 };

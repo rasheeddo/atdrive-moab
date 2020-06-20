@@ -118,12 +118,13 @@ void IMU_daemon::main_worker() {
 			_mData.temperature = bmp1._temp;
 			_mData.pressure = bmp1._press;
 
-			//u_printf("bmp._temp: %f\n", bmp1._temp);
-			//u_printf("bmp._press: %f\n", bmp1._press);
+			u_printf("bmp._temp: %f\n", bmp1._temp);
+			u_printf("bmp._press: %f\n", bmp1._press);
 		}
 
 
 		count++;
+		
 		if (count > 500) {
 			count = 0;
 
@@ -132,6 +133,11 @@ void IMU_daemon::main_worker() {
 
 			compass.init();
 		}
+	
+	
+
 	}
+
+
 }
 

@@ -29,7 +29,8 @@ class VescUart
 		VescUart(PinName, PinName);
 
 		/** Variabel to hold measurements returned from VESC */
-		dataPackage data; 
+		dataPackage data;
+		dataPackage data1;  
 
 		/**
 		 * @brief      Sends a command to VESC and stores the returned data
@@ -37,6 +38,8 @@ class VescUart
 		 * @return     True if successfull otherwise false
 		 */
 		bool getVescValues(void);
+
+		bool getVescValues(int vescID);
 
 		/**
 		 * @brief      Sends values for joystick and buttons to the nunchuck app
@@ -61,11 +64,15 @@ class VescUart
 		 */
 		void setRPM(float rpm);
 
+		void setRPM(float rpm, int vescID);
+
 		/**
 		 * @brief      Set the duty of the motor
 		 * @param      duty  - The desired duty (0.0-1.0)
 		 */
 		void setDuty(float duty);
+
+		void setDuty(float duty, int vescID);
 
 		/**
 		 * @brief      Help Function to print struct dataPackage over Serial for Debug
@@ -114,6 +121,8 @@ class VescUart
 		 * @return     True if the process was a success
 		 */
 		bool processReadPacket(uint8_t * message);
+
+		bool processReadPacket(uint8_t * message, int vescID);
 
 		/**
 		 * @brief      Help Function to print uint8_t array over Serial for Debug

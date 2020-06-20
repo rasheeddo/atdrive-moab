@@ -203,6 +203,40 @@ bool VescUart::processReadPacket(uint8_t * message) {
 	}
 }
 
+bool VescUart::processReadPacket(uint8_t * message, int vescID) {
+
+	COMM_PACKET_ID packetId;
+	int32_t ind = 0;
+
+	packetId = (COMM_PACKET_ID)message[0];
+	message++; // Removes the packetId from the actual message (payload)
+
+	switch (packetId){
+		case COMM_GET_VALUES: // Structure defined here: https://github.com/vedderb/bldc/blob/43c3bbaf91f5052a35b75c2ff17b5fe99fad94d1/commands.c#L164
+
+			ind = 4; // Skip the first 4 bytes 
+			data1.avgMotorCurrent 	= buffer_get_float32(message, 100.0, &ind);
+			data1.avgInputCurrent 	= buffer_get_float32(message, 100.0, &ind);
+			ind += 8; // Skip the next 8 bytes
+			data1.dutyCycleNow 		= buffer_get_float16(message, 1000.0, &ind);
+			data1.rpm 				= buffer_get_int32(message, &ind);
+			data1.inpVoltage 		= buffer_get_float16(message, 10.0, &ind);
+			data1.ampHours 			= buffer_get_float32(message, 10000.0, &ind);
+			data1.ampHoursCharged 	= buffer_get_float32(message, 10000.0, &ind);
+			ind += 8; // Skip the next 8 bytes 
+			data1.tachometer 		= buffer_get_int32(message, &ind);
+			data1.tachometerAbs 		= buffer_get_int32(message, &ind);
+			return true;
+
+		break;
+
+		default:
+			return false;
+		break;
+	}
+}
+
+
 bool VescUart::getVescValues(void) {
 
 	uint8_t command[1] = { COMM_GET_VALUES };
@@ -215,6 +249,31 @@ bool VescUart::getVescValues(void) {
 
 	if (lenPayload > 55) {
 		bool read = processReadPacket(payload); //returns true if sucessful
+		return read;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+bool VescUart::getVescValues(int vescID) {
+
+	int32_t index = 0;
+	uint8_t command[3];
+	command[index++] = { COMM_FORWARD_CAN };
+	command[index++] = { vescID };
+	command[index++] = { COMM_GET_VALUES };
+
+	uint8_t payload[256];
+
+	packSendPayload(command, 3);
+	// delay(1); //needed, otherwise data is not read
+
+	int lenPayload = receiveUartMessage(payload);
+
+	if (lenPayload > 55) {
+		bool read = processReadPacket(payload, vescID); //returns true if sucessful
 		return read;
 	}
 	else
@@ -254,6 +313,18 @@ void VescUart::setRPM(float rpm) {
 	packSendPayload(payload, 5);
 }
 
+void VescUart::setRPM(float rpm, int vescID) {
+	int32_t index = 0;
+	uint8_t payload[7];
+
+	payload[index++] = COMM_FORWARD_CAN ;
+	payload[index++] = vescID;
+	payload[index++] = COMM_SET_RPM;
+	buffer_append_int32(payload, (int32_t)(rpm), &index);
+
+	packSendPayload(payload, 7);
+}
+
 void VescUart::setDuty(float duty) {
 	int32_t index = 0;
 	uint8_t payload[5];
@@ -262,6 +333,18 @@ void VescUart::setDuty(float duty) {
 	buffer_append_int32(payload, (int32_t)(duty * 100000), &index);
 
 	packSendPayload(payload, 5);
+}
+
+void VescUart::setDuty(float duty, int vescID) {
+	int32_t index = 0;
+	uint8_t payload[7];
+
+	payload[index++] = COMM_FORWARD_CAN ;
+	payload[index++] = vescID;
+	payload[index++] = COMM_SET_DUTY;
+	buffer_append_int32(payload, (int32_t)(duty * 100000), &index);
+
+	packSendPayload(payload, 7);
 }
 
 

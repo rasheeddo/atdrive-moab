@@ -72,7 +72,7 @@ PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
 //XWheels drive(PD_1, PD_0);
 VESC vesc(&tx_sock);
 float motorRPM[2];
-
+float motorPercent[2];
 // S.Bus is 100000Hz, 8E2, electrically inverted
 RawSerial sbus_in(NC, PD_2, 100000);  // tx, then rx
 
@@ -154,6 +154,7 @@ void set_mode_sbus_failsafe() {
 	//motorControl.set_steering(1024);
 	//motorControl.set_throttle(352);
 	vesc.setRPMs(vesc.ZERO_RPM, vesc.ZERO_RPM);
+	//vesc.setPercents(0.0, 0.0);
 	sbus_a_forImuPacket = 1024;
 	sbus_b_forImuPacket = 352;
 }
@@ -166,6 +167,7 @@ void set_mode_stop() {
 	//motorControl.set_steering(sbup.ch1);
 	//motorControl.set_throttle(352);
 	vesc.setRPMs(vesc.ZERO_RPM, vesc.ZERO_RPM);
+	//vesc.setPercents(0.0, 0.0);
 	sbus_a_forImuPacket = 1024;
 	sbus_b_forImuPacket = 352;
 }
@@ -201,10 +203,12 @@ void set_mode_manual() {
 #ifdef _FUTABA
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
+	//vesc.vehicleControl_Percent(sbup.ch2, sbup.ch4, motorPercent);
 	vesc.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
 #endif
 
-	vesc.setRPMs(motorRPM[0],motorRPM[1]);
+	vesc.setRPMs(motorRPM[0], motorRPM[1], true);
+	//vesc.setPercents(motorPercent[0], motorPercent[1]);
 }
 
 void set_mode_auto() {
@@ -223,7 +227,9 @@ void set_mode_auto() {
 	//u_printf("auto motor: %f %f\n", leftRPM, rightRPM);
 	drive.setRPMs(rightRPM, leftRPM);
 	*/
-	vesc.setRPMs(rpmR,rpmL);
+	vesc.setRPMs(rpmR,rpmL, false);
+	//vesc.setPercents(rpmR,rpmL);
+
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
 }
@@ -425,7 +431,7 @@ int main() {
 	imu_daemon.Start();  // will start a separate thread
 	gps_daemon.Start();  // will start a separate thread
 	//rtcm3_daemon.Start();  // will start a separate thread
-	pushButton_daemon.Start();  // will start a separate thread
+	//pushButton_daemon.Start();  // will start a separate thread
 	//mux_daemon.Start();
 
 	//drive.Start(); // will start a separate thread
@@ -450,7 +456,7 @@ int main() {
 				ThisThread::sleep_for(20);
 		}
 
-		u_printf("heartbeat: %d\n", ct);
+		//u_printf("heartbeat: %d\n", ct);
 
 		// Report motor values (for convience when setting trim)
 		//uint16_t sbus_a = motorControl.get_value_a();

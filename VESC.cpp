@@ -3,7 +3,6 @@
 extern void u_printf(const char *fmt, ...);  // Defined in main()
 
 VescUart vesc0(PD_1, PD_0);
-VescUart vesc1(PD_5, PD_6);
 
 VESC::VESC(UDPSocket *tx_sock){
 
@@ -15,39 +14,62 @@ VESC::VESC(UDPSocket *tx_sock){
 
 void VESC::Start() {
 	main_thread.start(callback(this, &VESC::main_worker));
+	// Tried to split thread as rpmR and rpmL but I cannot getVescValues() working properly
+	// let's first try put it all in one thread
 }
-
 
 void VESC::main_worker(){
 
 	ThisThread::sleep_for(1000);
 
-	float read_rpm0 = 0.0;
-	float read_rpm1 = 0.0;
-	float in_voltage0 = 0.0;
-	float in_voltage1 = 0.0;
-	float in_current0 = 0.0;
-	float in_current1 = 0.0;
- 
-
 	while(true){
 
-		vesc0.setRPM(RPM_TO_ERPM(_rpmR));
-		vesc1.setRPM(RPM_TO_ERPM(_rpmL));
-		
+
+		if (_man_flag){
+			vesc0.setDuty(RPM_TO_DUTY(_rpmR));
+			vesc0.setDuty(RPM_TO_DUTY(_rpmL),1);
+
+		} else{
+
+			// 30RPM seems to be the lowest speed control that 
+			// the wheel doesn't vibrate to much, lower than this is kind of not stable
+			// so lower than this better to run in DutyCycle
+			
+			if (abs(_rpmR) < 30.0){
+				vesc0.setDuty(RPM_TO_DUTY(_rpmR));
+			} else{
+				vesc0.setRPM(RPM_TO_ERPM(_rpmR));
+			}
+
+			if (abs(_rpmL) < 30.0){
+				vesc0.setDuty(RPM_TO_DUTY(_rpmL),1);
+			} else{
+				vesc0.setRPM(RPM_TO_ERPM(_rpmL),1);
+			}
+			
+			// Use PID speed control in kiw soeed the motors quite oscillate
+			//vesc0.setRPM(RPM_TO_ERPM(_rpmR));
+			//vesc0.setRPM(RPM_TO_ERPM(_rpmL),1);
+		}
+
+		// Get a values from each channel of vesc
 		if (vesc0.getVescValues()){
 			read_rpm0 = ERPM_TO_RPM(vesc0.data.rpm);
 			in_voltage0 = vesc0.data.inpVoltage;
 			in_current0 = vesc0.data.avgInputCurrent;
+			//u_printf("read_rpm0: %f  in_voltage0: %f  in_current0: %f\n", read_rpm0, in_voltage0, in_current0);
+		}
+
+		
+		if (vesc0.getVescValues(1)){
+			read_rpm1 = ERPM_TO_RPM(vesc0.data1.rpm);
+			in_voltage1 = vesc0.data1.inpVoltage;
+			in_current1 = vesc0.data1.avgInputCurrent;
+			//u_printf("read_rpm1: %f  in_voltage1: %f  in_current1: %f\n", read_rpm1, in_voltage1, in_current1);
+
 		}
 		
-		if (vesc1.getVescValues()){
-			read_rpm1 = ERPM_TO_RPM(vesc1.data.rpm);
-			in_voltage1 = vesc1.data.inpVoltage;
-			in_current1 = vesc1.data.avgInputCurrent;
-
-		}
-
+		// Report vesc values to UDP port
 		vescs_reported_data._inpVoltage = (in_voltage0 + in_voltage1)/2.0;
 		vescs_reported_data._avgInputCurrent = (in_current0 + in_current1)/2.0;
 		vescs_reported_data._rpmR = read_rpm0;
@@ -55,17 +77,17 @@ void VESC::main_worker(){
 
 		int retval = _sock->sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_VESC, 
 			(char *) &vescs_reported_data, sizeof(vescs_reported_data));
-	
 
-		//_usb_debug->printf("read_rpm0: %f   read_rpm1: %f\n", read_rpm0, read_rpm1);
 
-		//ThisThread::sleep_for(10);
-		
+		// I found that when IMU thread is running, it makes this delay for ~100ms
+		// and seems like we cannot fix that, the data rate from VESC becomes only 10Hz
+		// so we don't need a delay below
+
+		//ThisThread::sleep_for(1);
 
 	}
-
-
 }
+
 
 inline float _linear_map(float x, float in_min, float in_max, float out_min, float out_max) {
 	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
@@ -79,13 +101,24 @@ float VESC::ERPM_TO_RPM(float erpm){
 	return erpm/_ERPM_ratio;
 }
 
+float VESC::RPM_TO_DUTY(float rpm){
+	return _linear_map(rpm, -MAX_RPM, MAX_RPM, -MAX_DUTY, MAX_DUTY);
+}
 
 void VESC::setRPMs(float rpmR, float rpmL){
 
 	_rpmR = rpmR;
 	_rpmL = rpmL;
-
 }
+
+
+void VESC::setRPMs(float rpmR, float rpmL, bool man_flag){
+
+	_rpmR = rpmR;
+	_rpmL = rpmL;
+	_man_flag = man_flag;
+}
+
 
 void VESC::vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]){   
     // UD_ch is up-down stick channel, in this case is ch2
@@ -157,4 +190,3 @@ void VESC::vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]){
     }  
    
 }
-
