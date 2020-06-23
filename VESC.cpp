@@ -34,7 +34,7 @@ void VESC::main_worker(){
 			// 30RPM seems to be the lowest speed control that 
 			// the wheel doesn't vibrate to much, lower than this is kind of not stable
 			// so lower than this better to run in DutyCycle
-			
+			/*
 			if (abs(_rpmR) < 30.0){
 				vesc0.setDuty(RPM_TO_DUTY(_rpmR));
 			} else{
@@ -46,10 +46,12 @@ void VESC::main_worker(){
 			} else{
 				vesc0.setRPM(RPM_TO_ERPM(_rpmL),1);
 			}
-			
-			// Use PID speed control in kiw soeed the motors quite oscillate
+			*/
+			// Use PID speed control in low speed the motors quite oscillate
 			//vesc0.setRPM(RPM_TO_ERPM(_rpmR));
 			//vesc0.setRPM(RPM_TO_ERPM(_rpmL),1);
+			vesc0.setDuty(RPM_TO_DUTY(_rpmR));
+			vesc0.setDuty(RPM_TO_DUTY(_rpmL),1);
 		}
 
 		// Get a values from each channel of vesc
