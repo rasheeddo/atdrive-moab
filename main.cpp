@@ -225,7 +225,7 @@ void set_mode_auto() {
 	drive.setRPMs(rightRPM, leftRPM);
 	*/
 	//drive.setRPMs(rpmR,rpmL);
-	attler.driveVehicle(rpmL_percent, rpmR_percent);
+	attler.driveVehicle(attler.L_DIR*rpmL_percent, attler.R_DIR*rpmR_percent);
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
 }

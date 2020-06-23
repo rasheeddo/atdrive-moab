@@ -18,6 +18,12 @@ public:
 	float get_pw_a(void);
 	float get_pw_b(void);
 
+	// If you push forward full throttle and there is one wheel turn wrong, changes the sign of that wheels
+	// the default is, PWM1 is right wheel, PWM2 is left wheel
+	int R_DIR = 1.0;    // choose 1.0 or -1.0
+	int L_DIR = -1.0;   // choose 1.0 or -1.0
+	int CURVE_SIGN = -1.0;
+
 private:
 	PwmOut *_motor_A;
 	PwmOut *_motor_B;
@@ -46,12 +52,6 @@ private:
 	float _RIGHT_PW_RANGE = 0.000400; //400
 	const float _RIGHT_PW_MAX = _RIGHT_PW_CENTER + _RIGHT_PW_RANGE;
 	const float _RIGHT_PW_MIN = _RIGHT_PW_CENTER - _RIGHT_PW_RANGE;
-
-	// If you push forward full throttle and there is one wheel turn wrong, changes the sign of that wheels
-	// the default is, PWM1 is right wheel, PWM2 is left wheel
-	int R_DIR = 1.0;    // choose 1.0 or -1.0
-	int L_DIR = -1.0;   // choose 1.0 or -1.0
-	int CURVE_SIGN = -1.0;
 
 };
 
