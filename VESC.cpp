@@ -24,17 +24,7 @@ void VESC::main_worker(){
 
 	while(true){
 
-		// Smotthing the command value
-		if ( abs(_rpmR - _rpmR_prev) > 0.1) {
-			_rpmR_drive = _rpmR / 50.0;
-		} else{
-			_rpmR_drive = (_rpmR + _rpmR_drive_prev)/2.0;
-		}
-		if ( abs(_rpmL - _rpmL_prev) > 0.1) {
-			_rpmL_drive = _rpmL / 50.0;
-		} else{
-			_rpmL_drive = (_rpmL + _rpmL_drive_prev)/2.0;
-		}
+		_timer.start();
 
 		if (_man_flag){
 			//vesc0.setDuty(RPM_TO_DUTY(_rpmR_drive));
@@ -63,8 +53,8 @@ void VESC::main_worker(){
 			// Use PID speed control in low speed the motors quite oscillate
 			//vesc0.setRPM(RPM_TO_ERPM(_rpmR));
 			//vesc0.setRPM(RPM_TO_ERPM(_rpmL),1);
-			vesc0.setDuty(RPM_TO_DUTY(_rpmR_drive));
-			vesc0.setDuty(RPM_TO_DUTY(_rpmL_drive),1);
+			vesc0.setDuty(RPM_TO_DUTY(_rpmR));
+			vesc0.setDuty(RPM_TO_DUTY(_rpmL),1);
 		}
 
 		// Get a values from each channel of vesc
@@ -92,6 +82,10 @@ void VESC::main_worker(){
 		int retval = _sock->sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_VESC, 
 			(char *) &vescs_reported_data, sizeof(vescs_reported_data));
 
+		_timer.stop();
+		_period = _timer.read();
+		u_printf("_period in VESC %f seconds", _period);
+		_timer.reset();
 
 		// I found that when IMU thread is running, it makes this delay for ~100ms
 		// and seems like we cannot fix that, the data rate from VESC becomes only 10Hz
