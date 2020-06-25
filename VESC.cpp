@@ -24,8 +24,21 @@ void VESC::main_worker(){
 
 	while(true){
 
+		// Smotthing the command value
+		if ( abs(_rpmR - _rpmR_prev) > 0.1) {
+			_rpmR_drive = _rpmR / 50.0;
+		} else{
+			_rpmR_drive = (_rpmR + _rpmR_drive_prev)/2.0;
+		}
+		if ( abs(_rpmL - _rpmL_prev) > 0.1) {
+			_rpmL_drive = _rpmL / 50.0;
+		} else{
+			_rpmL_drive = (_rpmL + _rpmL_drive_prev)/2.0;
+		}
 
 		if (_man_flag){
+			//vesc0.setDuty(RPM_TO_DUTY(_rpmR_drive));
+			//vesc0.setDuty(RPM_TO_DUTY(_rpmL_drive),1);
 			vesc0.setDuty(RPM_TO_DUTY(_rpmR));
 			vesc0.setDuty(RPM_TO_DUTY(_rpmL),1);
 
@@ -50,8 +63,8 @@ void VESC::main_worker(){
 			// Use PID speed control in low speed the motors quite oscillate
 			//vesc0.setRPM(RPM_TO_ERPM(_rpmR));
 			//vesc0.setRPM(RPM_TO_ERPM(_rpmL),1);
-			vesc0.setDuty(RPM_TO_DUTY(_rpmR));
-			vesc0.setDuty(RPM_TO_DUTY(_rpmL),1);
+			vesc0.setDuty(RPM_TO_DUTY(_rpmR_drive));
+			vesc0.setDuty(RPM_TO_DUTY(_rpmL_drive),1);
 		}
 
 		// Get a values from each channel of vesc
@@ -61,7 +74,6 @@ void VESC::main_worker(){
 			in_current0 = vesc0.data.avgInputCurrent;
 			//u_printf("read_rpm0: %f  in_voltage0: %f  in_current0: %f\n", read_rpm0, in_voltage0, in_current0);
 		}
-
 		
 		if (vesc0.getVescValues(1)){
 			read_rpm1 = ERPM_TO_RPM(vesc0.data1.rpm);
@@ -111,6 +123,7 @@ void VESC::setRPMs(float rpmR, float rpmL){
 
 	_rpmR = rpmR;
 	_rpmL = rpmL;
+
 }
 
 
