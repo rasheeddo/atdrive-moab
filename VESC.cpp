@@ -30,7 +30,7 @@ void VESC::main_worker(){
 			//vesc0.setDuty(RPM_TO_DUTY(_rpmR_drive));
 			//vesc0.setDuty(RPM_TO_DUTY(_rpmL_drive),1);
 			vesc0.setDuty(RPM_TO_DUTY(_rpmR));
-			vesc0.setDuty(RPM_TO_DUTY(_rpmL),1);
+			//vesc0.setDuty(RPM_TO_DUTY(_rpmL),1);
 
 		} else{
 
@@ -64,7 +64,7 @@ void VESC::main_worker(){
 			in_current0 = vesc0.data.avgInputCurrent;
 			//u_printf("read_rpm0: %f  in_voltage0: %f  in_current0: %f\n", read_rpm0, in_voltage0, in_current0);
 		}
-		
+		/*
 		if (vesc0.getVescValues(1)){
 			read_rpm1 = ERPM_TO_RPM(vesc0.data1.rpm);
 			in_voltage1 = vesc0.data1.inpVoltage;
@@ -86,7 +86,7 @@ void VESC::main_worker(){
 		_period = _timer.read();
 		u_printf("_period in VESC %f seconds", _period);
 		_timer.reset();
-
+*/
 		// I found that when IMU thread is running, it makes this delay for ~100ms
 		// and seems like we cannot fix that, the data rate from VESC becomes only 10Hz
 		// so we don't need a delay below

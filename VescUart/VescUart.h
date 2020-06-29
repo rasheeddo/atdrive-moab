@@ -132,6 +132,9 @@ class VescUart
 		 */
 		void serialPrint(uint8_t * data, int len);
 
+		
+		char _recvBuf[_BUFFER_SIZE];
+		
 };
 
 #endif

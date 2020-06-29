@@ -8,6 +8,17 @@ VescUart::VescUart(PinName a, PinName b){
 	//_usb_debug = new RawSerial(USBTX,USBRX,115200);
 
 	_uart = new RawSerial(_tx_pin, _rx_pin, 115200);
+	_uart->attach(callback(this, &VescUart::_Serial_Rx_Interrupt));
+
+}
+
+void VescUart::_Serial_Rx_Interrupt(){
+
+	while(_uart->readable()) {
+		
+		
+
+	}
 
 }
 
@@ -58,6 +69,8 @@ int VescUart::receiveUartMessage(uint8_t * payloadReceived) {
 				break;
 			}
 
+
+			// if this is true we will get out from this outer whiel loop
 			if (counter == endMessage && messageReceived[endMessage - 1] == 3) {
 				messageReceived[endMessage] = 0;
 				if (_usb_debug != NULL) {
@@ -68,6 +81,7 @@ int VescUart::receiveUartMessage(uint8_t * payloadReceived) {
 			}
 		}
 	}
+
 	if(messageRead == false && _usb_debug != NULL ) {
 		_usb_debug->printf("Timeout\n");
 	}
