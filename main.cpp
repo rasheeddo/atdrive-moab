@@ -28,7 +28,7 @@
 #include "SbusParser.hpp"
 //#include "MotorControl.hpp"
 //#include "XWheels.hpp"
-#include "VESC.hpp"
+#include "VescUart/VescUart.h"
 
 
 EventFlags event_flags;
@@ -70,7 +70,7 @@ PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
 // Motors:
 //MotorControl motorControl(PD_14, PD_15);
 //XWheels drive(PD_1, PD_0);
-VESC vesc(&tx_sock);
+VescUart vesc(PD_1, PD_0, &tx_sock);
 float motorRPM[2];
 float motorPercent[2];
 // S.Bus is 100000Hz, 8E2, electrically inverted

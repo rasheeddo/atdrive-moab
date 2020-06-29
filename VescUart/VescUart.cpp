@@ -1,26 +1,132 @@
 #include "VescUart.h"
 
-VescUart::VescUart(PinName a, PinName b){
+extern void u_printf(const char *fmt, ...);  // Defined in main()
+
+VescUart::VescUart(PinName a, PinName b, UDPSocket *tx_sock){
 
 	_tx_pin = a;
 	_rx_pin = b;
 
-	//_usb_debug = new RawSerial(USBTX,USBRX,115200);
+	_sock = tx_sock;
+
+	_usb_debug = new RawSerial(USBTX,USBRX,115200);
 
 	_uart = new RawSerial(_tx_pin, _rx_pin, 115200);
 	_uart->attach(callback(this, &VescUart::_Serial_Rx_Interrupt));
 
+	// _ringBuf = new CircularBuffer<char, _RING_BUFFER_SIZE>;
+
+}
+
+void VescUart::Start() {
+	main_thread.start(callback(this, &VescUart::main_worker));
 }
 
 void VescUart::_Serial_Rx_Interrupt(){
 
-	while(_uart->readable()) {
-		
-		
+	//char c;
 
+	while(_uart->readable()) {
+
+		_ringBuf[_count] = _uart->getc(); //c = _uart->getc();
+		_count++;
+
+		if (_count >= _RING_BUFFER_SIZE) {
+			_count = 0; //_ringBuf->push(c);
+			_readyToAsk = true;
+		}
+		
 	}
 
 }
+
+void VescUart::main_worker(){
+
+	ThisThread::sleep_for(1000);
+
+	while(true){
+
+		//_timer.start();
+
+		//////////////////////////////////// WRITE SPEED COMMAND //////////////////////////////////
+		if (_man_flag){
+
+#ifdef _XWHEELS
+			setDuty(RPM_TO_DUTY(_rpmR));
+			setDuty(RPM_TO_DUTY(_rpmL),1);
+#endif
+#ifdef _OFFROAD
+			setRPM(RPM_TO_ERPM(_rpmR));
+			setRPM(RPM_TO_ERPM(_rpmL),1);
+#endif
+
+		} else{
+
+#ifdef _XWHEELS
+			setDuty(RPM_TO_DUTY(_rpmR));
+			setDuty(RPM_TO_DUTY(_rpmL),1);
+#endif			
+#ifdef _OFFROAD			
+			setRPM(RPM_TO_ERPM(_rpmR));
+			setRPM(RPM_TO_ERPM(_rpmL),1);
+#endif
+		}
+
+		//////////////////////////////////// READ SPEED FEEDBACK /////////////////////////////////
+
+		// set command to ask for a speed (getVescValues)
+		recvUartWorker();
+		//_usb_debug->printf("rpm0: %f   rpm1:%f \n", data.rpm, data1.rpm);
+
+		//////////////////////////////////// REPORT SPEED FEEDBACK //////////////////////////////
+		int retval = _sock->sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_VESC, 
+			(char *) &report_data, sizeof(report_data));
+
+		// _timer.stop();
+		// _period = _timer.read();
+		// u_printf("_period in VESC %f seconds", _period);
+		// _timer.reset();
+	}
+
+}
+
+void VescUart::recvUartWorker(){
+
+	uint8_t vesc0_payloadReceived[78];
+	uint8_t vesc1_payloadReceived[78];
+
+	if (_readyToAsk){
+		askForValues();
+		//ThisThread::sleep_for(0.5);
+		askForValues(1);
+		//ThisThread::sleep_for(0.5);
+		_readyToAsk = false;
+	} else{
+
+		// what I want to do here is just copy first half of _ringBuf as ves0Buf
+		// and second half as vesc1Buf, there might be a std function to do this I think
+		for (int i=0; i<78; i++){
+			_vesc0Buf[i] = _ringBuf[i];
+		}
+		for (int i=0; i<78; i++){
+			_vesc1Buf[i] = _ringBuf[i+78];
+		}
+
+
+		// unpack received data
+		bool vesc0_unpacked = unpackPayload(_vesc0Buf, 78, vesc0_payloadReceived);
+		bool vesc1_unpacked = unpackPayload(_vesc1Buf, 78, vesc1_payloadReceived);
+
+		// parse byte data to struct as user can use
+		bool proFlag0 = processReadPacket(vesc0_payloadReceived);
+		bool proFlag1 = processReadPacket(vesc1_payloadReceived, 1);
+
+		report_data._reported_rpmR = ERPM_TO_RPM(data.rpm);
+		report_data._reported_rpmL = ERPM_TO_RPM(data1.rpm);
+
+	}
+}
+
 
 int VescUart::receiveUartMessage(uint8_t * payloadReceived) {
 
@@ -114,7 +220,7 @@ bool VescUart::unpackPayload(uint8_t * message, int lenMes, uint8_t * payload) {
 	crcMessage += message[lenMes - 2];
 
 	if(_usb_debug!=NULL){
-		_usb_debug->printf("SRC received: %d\n", crcMessage);
+		//_usb_debug->printf("SRC received: %d\n", crcMessage);
 	}
 
 	// Extract payload:
@@ -123,16 +229,16 @@ bool VescUart::unpackPayload(uint8_t * message, int lenMes, uint8_t * payload) {
 	crcPayload = crc16(payload, message[1]);
 
 	if( _usb_debug != NULL ){
-		_usb_debug->printf("SRC calc: %d\n", crcPayload);
+		//_usb_debug->printf("SRC calc: %d\n", crcPayload);
 	}
 	
 	if (crcPayload == crcMessage) {
 		if( _usb_debug != NULL ) {
-			_usb_debug->printf("Received: "); 
-			serialPrint(message, lenMes);
+			//_usb_debug->printf("Received: "); 
+			//serialPrint(message, lenMes);
 
-			_usb_debug->printf("Payload : ");
-			serialPrint(payload, message[1] - 1);
+			//_usb_debug->printf("Payload : ");
+			//serialPrint(payload, message[1] - 1);
 		}
 
 		return true;
@@ -169,8 +275,8 @@ int VescUart::packSendPayload(uint8_t * payload, int lenPay) {
 	messageSend[count] = '\0';
 
 	if(_usb_debug!=NULL){
-		_usb_debug->printf("UART package send: "); 
-		serialPrint(messageSend, count);
+		//_usb_debug->printf("UART package send: "); 
+		//serialPrint(messageSend, count);
 	}
 
 	// Sending package
@@ -296,6 +402,25 @@ bool VescUart::getVescValues(int vescID) {
 	}
 }
 
+void VescUart::askForValues(){
+	uint8_t command[1] = { COMM_GET_VALUES };
+	uint8_t payload[256];
+
+	packSendPayload(command, 1);
+}
+
+void VescUart::askForValues(int vescID){
+	int32_t index = 0;
+	uint8_t command[3];
+	command[index++] = { COMM_FORWARD_CAN };
+	command[index++] = { vescID };
+	command[index++] = { COMM_GET_VALUES };
+
+	uint8_t payload[256];
+
+	packSendPayload(command, 3);
+}
+
 
 void VescUart::setCurrent(float current) {
 	int32_t index = 0;
@@ -388,4 +513,109 @@ void VescUart::printVescValues() {
 		_usb_debug->printf("tachometer: %f\n", data.tachometer);
 		_usb_debug->printf("tachometerAbs: %f\n", data.tachometerAbs);
 	}
+}
+
+
+
+inline float _linear_map(float x, float in_min, float in_max, float out_min, float out_max) {
+	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+float VescUart::RPM_TO_ERPM(float rpm){
+	return rpm*_ERPM_ratio;
+}
+
+float VescUart::ERPM_TO_RPM(float erpm){
+	return erpm/_ERPM_ratio;
+}
+
+float VescUart::RPM_TO_DUTY(float rpm){
+	return _linear_map(rpm, -MAX_RPM, MAX_RPM, -MAX_DUTY, MAX_DUTY);
+}
+
+void VescUart::setRPMs(float rpmR, float rpmL){
+
+	_rpmR = rpmR;
+	_rpmL = rpmL;
+
+}
+
+
+void VescUart::setRPMs(float rpmR, float rpmL, bool man_flag){
+
+	_rpmR = rpmR;
+	_rpmL = rpmL;
+	_man_flag = man_flag;
+}
+
+
+void VescUart::vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]){   
+    // UD_ch is up-down stick channel, in this case is ch2
+    // LR_ch is left-right stick channel, in this case is ch4
+    // MotorRPM[0] is a right wheel
+    // MotorRPM[1] is a left wheel
+
+    float MIN_SCALER = 1000.0;
+    float MAX_SCALER = 2000.0;
+    
+
+    /////////////////////////////////////////////////////// STRAIGHT DRIVE ////////////////////////////////////////////////////////////////
+    // In case the stick near mid for both ch2 and ch4
+    if (LR_ch <= MAX_DEADBAND && LR_ch >= MIN_DEADBAND && UD_ch <= MAX_DEADBAND && UD_ch >= MIN_DEADBAND)
+    {
+        MotorRPM[0] = ZERO_RPM;
+        MotorRPM[1] = ZERO_RPM;
+    }
+
+    // user push ch2 up or down, UGV drive forward or backward, two wheels same speed and direction
+    else if(LR_ch <= MAX_DEADBAND && LR_ch >= MIN_DEADBAND && (UD_ch > MAX_DEADBAND || UD_ch < MIN_DEADBAND))
+    {
+        MotorRPM[0] = (float)_linear_map(UD_ch, MIN_STICK, MAX_STICK, -MAX_RPM, MAX_RPM);
+        MotorRPM[1] = MotorRPM[0];
+
+    }
+    /////////////////////////////////////////////////////////// TURNS /////////////////////////////////////////////////////////////////////
+    // user push ch4 left or right, UGV turns left or right, two wheels same speed but reverse direction
+    else if(UD_ch <= MAX_DEADBAND && UD_ch >= MIN_DEADBAND && (LR_ch >= MAX_DEADBAND || LR_ch <= MIN_DEADBAND))
+    {
+        MotorRPM[1] = (float)_linear_map(LR_ch, MIN_STICK, MAX_STICK, -MAX_RPM/2, MAX_RPM/2);
+        MotorRPM[0] = -MotorRPM[1];
+    }
+    /////////////////////////////////////////////////////////// CURVES /////////////////////////////////////////////////////////////////////
+    // user push both ch2 and ch4 diagonally (first quadrant), UGV curves to the right forward, one wheels is half speed of the another one
+    else if(UD_ch > MAX_DEADBAND && LR_ch > MAX_DEADBAND)
+    {
+        MotorRPM[1] = (float)_linear_map(UD_ch, MAX_DEADBAND+1, MAX_STICK, ZERO_RPM, MAX_RPM);
+        float SCALE = (float)_linear_map(LR_ch, MAX_DEADBAND+1, MAX_STICK, MIN_SCALER, MAX_SCALER);
+        MotorRPM[0] = MotorRPM[1]*MIN_SCALER/SCALE;
+        //printf("SCALE %f\n",SCALE);
+    } 
+
+     // user push both ch2 and ch4 diagonally (second quadrant), UGV curves to the left forward, one wheels is half speed of the another one
+    else if(UD_ch > MAX_DEADBAND && LR_ch < MIN_DEADBAND)
+    {
+        MotorRPM[0] = (float)_linear_map(UD_ch, MAX_DEADBAND+1, MAX_STICK, ZERO_RPM, MAX_RPM);
+        float SCALE = (float)_linear_map(LR_ch, MIN_DEADBAND-1, MIN_STICK, MIN_SCALER, MAX_SCALER);
+        MotorRPM[1] = MotorRPM[0]*MIN_SCALER/SCALE;
+        //printf("SCALE %f\n",SCALE);
+    }   
+
+    // user push both ch2 and ch4 diagonally (third quadrant), UGV curves to the left backward, one wheels is half speed of the another one
+    else if(UD_ch < MIN_DEADBAND && LR_ch < MIN_DEADBAND)
+    {
+        MotorRPM[0] = (float)_linear_map(UD_ch, MIN_DEADBAND-1, MIN_STICK, ZERO_RPM, -MAX_RPM);
+        float SCALE = (float)_linear_map(LR_ch, MIN_DEADBAND-1, MIN_STICK, MIN_SCALER, MAX_SCALER);
+        MotorRPM[1] = MotorRPM[0]*MIN_SCALER/SCALE;
+        //printf("SCALE %f\n",SCALE);
+    }
+
+     // user push both ch2 and ch4 diagonally (fourth quadrant), UGV curves to the right backward, one wheels is half speed of the another one
+    else if(UD_ch < MIN_DEADBAND && LR_ch > MAX_DEADBAND)
+    {
+        MotorRPM[1] = (float)_linear_map(UD_ch, MIN_DEADBAND-1, MIN_STICK, ZERO_RPM, -MAX_RPM);
+        float SCALE = (float)_linear_map(LR_ch, MAX_DEADBAND+1, MAX_STICK, MIN_SCALER, MAX_SCALER);
+        MotorRPM[0] = MotorRPM[1]*MIN_SCALER/SCALE;
+        //printf("SCALE %f\n",SCALE);
+    }  
+   
 }

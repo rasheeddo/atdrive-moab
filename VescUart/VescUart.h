@@ -6,6 +6,9 @@
 #include "datatypes.h"
 #include "buffer.h"
 #include "crc.h"
+#include "ROBOT_CONFIG.hpp"
+#include "MOAB_DEFINITIONS.h"
+#include "platform/CircularBuffer.h"
 
 class VescUart
 {
@@ -14,7 +17,7 @@ class VescUart
 		float avgMotorCurrent;
 		float avgInputCurrent;
 		float dutyCycleNow;
-		long rpm;
+		float rpm;
 		float inpVoltage;
 		float ampHours;
 		float ampHoursCharged;
@@ -22,62 +25,77 @@ class VescUart
 		long tachometerAbs;
 	};
 
+	struct vesc_data{
+		float _reported_rpmR;
+		float _reported_rpmL;
+	};
+
 	public:
-		/**
-		 * @brief      Class constructor
-		 */
-		VescUart(PinName, PinName);
 
-		/** Variabel to hold measurements returned from VESC */
+		VescUart(PinName, PinName, UDPSocket*);
+
 		dataPackage data;
-		dataPackage data1;  
+		dataPackage data1;
+		vesc_data report_data;  
 
-		/**
-		 * @brief      Sends a command to VESC and stores the returned data
-		 *
-		 * @return     True if successfull otherwise false
-		 */
-		bool getVescValues(void);
+		
+		void Start();
 
-		bool getVescValues(int vescID);
+		// set speed of two wheels
+		void setRPMs(float , float);
 
-		/**
-		 * @brief      Sends values for joystick and buttons to the nunchuck app
-		 */
-		void setNunchuckValues(void);
+		// set speed of two wheels in case manual is true flag, auto is false flag
+		void setRPMs(float , float, bool);
 
-		/**
-		 * @brief      Set the current to drive the motor
-		 * @param      current  - The current to apply
-		 */
-		void setCurrent(float current);
+		// convert SBUS stick value to motor RPM of each wheel
+		void vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]);
 
-		/**
-		 * @brief      Set the current to brake the motor
-		 * @param      brakeCurrent  - The current to apply
-		 */
-		void setBrakeCurrent(float brakeCurrent);
+#ifdef _FUTABA
 
-		/**
-		 * @brief      Set the rpm of the motor
-		 * @param      rpm  - The desired RPM (actually eRPM = RPM * poles)
-		 */
-		void setRPM(float rpm);
+        int MIN_STICK = 360;       
+        int MAX_STICK = 1673;      
 
-		void setRPM(float rpm, int vescID);
+        int MIN_DEADBAND = 1014;
+        int MAX_DEADBAND = 1034;
 
-		/**
-		 * @brief      Set the duty of the motor
-		 * @param      duty  - The desired duty (0.0-1.0)
-		 */
-		void setDuty(float duty);
+        int MID_STICK = 1024;
+        int DIVIDER = 2;           		// a divider of another wheel's speed, 
+        								// e.g. 2 is half speed of the another wheel's speed
+#ifdef _XWHEELS
+        float MAX_RPM = 136.0;          // XWheels -> 136.0
+        								// Flipsky's wheels -> I guess even >500 but keep it safe as 300
+#endif
+#ifdef _OFFROAD
+		float MAX_RPM = 300.0; 
+#endif						 	
+        							 	  
+        float ZERO_RPM = 0.0;           
 
-		void setDuty(float duty, int vescID);
+#endif
 
-		/**
-		 * @brief      Help Function to print struct dataPackage over Serial for Debug
-		 */
-		void printVescValues(void);
+#ifdef _LTE_PROPO
+
+        int MIN_STICK = 283;     
+        int MAX_STICK = 1758;    
+
+        int MIN_DEADBAND = 924;
+        int MAX_DEADBAND = 1124;
+
+        int MID_STICK = 1024;
+        int DIVIDER = 2;           		// a divider of another wheel's speed, 
+        								// e.g. 2 is half speed of the another wheel's speed
+
+#ifdef _XWHEELS
+        float MAX_RPM = 136.0;          // XWheels -> 136.0
+        								// Flipsky's wheels -> I guess even >500 but keep it safe as 300
+#endif
+#ifdef _OFFROAD
+		float MAX_RPM = 300.0; 
+#endif	
+
+        float ZERO_RPM = 0.0;           
+
+#endif
 
 	private: 
 
@@ -87,53 +105,93 @@ class VescUart
         RawSerial *_uart;
         RawSerial *_usb_debug;
 
-		/**
-		 * @brief      Packs the payload and sends it over Serial
-		 *
-		 * @param      payload  - The payload as a unit8_t Array with length of int lenPayload
-		 * @param      lenPay   - Length of payload
-		 * @return     The number of bytes send
-		 */
+        Timer _timer;
+
+        // CircularBuffer<char, MUX_BUF_SIZE> *_rxbuf;
+
+        Thread main_thread;
+
+        UDPSocket *_sock;
+		
+		////////////////////////////////////////////////////////
+		//-------------- My modified functions -------------- //
+		////////////////////////////////////////////////////////
+
+        void main_worker();
+
+        void _Serial_Rx_Interrupt();
+
+		float RPM_TO_ERPM(float rpm);
+
+		float ERPM_TO_RPM(float erpm);
+
+		float RPM_TO_DUTY(float rpm);
+
+		/////////////////////////////////////////////////////////////////////////
+		//--------------- Original functions from SolidGeek -------------------//
+		//        check this out https://github.com/SolidGeek/VescUart         //
+		/////////////////////////////////////////////////////////////////////////
+
 		int packSendPayload(uint8_t * payload, int lenPay);
 
-		/**
-		 * @brief      Receives the message over Serial
-		 *
-		 * @param      payloadReceived  - The received payload as a unit8_t Array
-		 * @return     The number of bytes receeived within the payload
-		 */
 		int receiveUartMessage(uint8_t * payloadReceived);
 
-		/**
-		 * @brief      Verifies the message (CRC-16) and extracts the payload
-		 *
-		 * @param      message  - The received UART message
-		 * @param      lenMes   - The lenght of the message
-		 * @param      payload  - The final payload ready to extract data from
-		 * @return     True if the process was a success
-		 */
 		bool unpackPayload(uint8_t * message, int lenMes, uint8_t * payload);
 
-		/**
-		 * @brief      Extracts the data from the received payload
-		 *
-		 * @param      message  - The payload to extract data from
-		 * @return     True if the process was a success
-		 */
 		bool processReadPacket(uint8_t * message);
 
 		bool processReadPacket(uint8_t * message, int vescID);
 
-		/**
-		 * @brief      Help Function to print uint8_t array over Serial for Debug
-		 *
-		 * @param      data  - Data array to print
-		 * @param      len   - Lenght of the array to print
-		 */
 		void serialPrint(uint8_t * data, int len);
 
+		bool getVescValues(void);
+
+		bool getVescValues(int vescID);
+
+		void setNunchuckValues(void);
+
+		void setCurrent(float current);
+
+		void setBrakeCurrent(float brakeCurrent);
+
+		void setRPM(float rpm);
+
+		void setDuty(float duty);
+
+		void printVescValues(void);
+
+		////////////////////////////////////////////////////////
+		//-------------- My modified functions -------------- //
+		////////////////////////////////////////////////////////
+
+		void setRPM(float rpm, int vescID);
+
+		void setDuty(float duty, int vescID);
+
+		void askForValues();
+
+		void askForValues(int vescID);
+
+		void recvUartWorker();
+
+		#define _RING_BUFFER_SIZE 156   // 78bytes for each ESC's reply
 		
-		char _recvBuf[_BUFFER_SIZE];
+		uint8_t _ringBuf[_RING_BUFFER_SIZE];
+
+		int _count = 0;
+		bool _readyToAsk = true;
+		float _rpmR;
+		float _rpmL;
+		bool _man_flag = true;
+
+		uint8_t _vesc0Buf[78];
+		uint8_t _vesc1Buf[78];
+
+		float _ERPM_ratio = 33.333;   // for big wheels (XWheels's hub)  1 RPM -> 140 ERPM
+									 // for small off-road tire (Flipsky's wheels set)  1 RPM -> 33.333 ERPM
+		float MAX_DUTY = 1.0;
+
+		float _period;
 		
 };
 

@@ -1,4 +1,4 @@
-#ifndef __VESC_HPP
+/*#ifndef __VESC_HPP
 #define __VESC_HPP
 
 #include "mbed.h"
@@ -133,4 +133,4 @@ class VESC{
 };
 
 
-#endif
+#endif*/

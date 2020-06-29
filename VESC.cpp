@@ -1,4 +1,4 @@
-#include "VESC.hpp"
+/*#include "VESC.hpp"
 
 extern void u_printf(const char *fmt, ...);  // Defined in main()
 
@@ -37,19 +37,19 @@ void VESC::main_worker(){
 			// 30RPM seems to be the lowest speed control that 
 			// the wheel doesn't vibrate to much, lower than this is kind of not stable
 			// so lower than this better to run in DutyCycle
-			/*
-			if (abs(_rpmR) < 30.0){
-				vesc0.setDuty(RPM_TO_DUTY(_rpmR));
-			} else{
-				vesc0.setRPM(RPM_TO_ERPM(_rpmR));
-			}
+			
+			//if (abs(_rpmR) < 30.0){
+			//	vesc0.setDuty(RPM_TO_DUTY(_rpmR));
+			//} else{
+			//	vesc0.setRPM(RPM_TO_ERPM(_rpmR));
+			//}
 
-			if (abs(_rpmL) < 30.0){
-				vesc0.setDuty(RPM_TO_DUTY(_rpmL),1);
-			} else{
-				vesc0.setRPM(RPM_TO_ERPM(_rpmL),1);
-			}
-			*/
+			//if (abs(_rpmL) < 30.0){
+			//	vesc0.setDuty(RPM_TO_DUTY(_rpmL),1);
+			//} else{
+			//	vesc0.setRPM(RPM_TO_ERPM(_rpmL),1);
+			//}
+			
 			// Use PID speed control in low speed the motors quite oscillate
 			//vesc0.setRPM(RPM_TO_ERPM(_rpmR));
 			//vesc0.setRPM(RPM_TO_ERPM(_rpmL),1);
@@ -64,7 +64,7 @@ void VESC::main_worker(){
 			in_current0 = vesc0.data.avgInputCurrent;
 			//u_printf("read_rpm0: %f  in_voltage0: %f  in_current0: %f\n", read_rpm0, in_voltage0, in_current0);
 		}
-		/*
+		
 		if (vesc0.getVescValues(1)){
 			read_rpm1 = ERPM_TO_RPM(vesc0.data1.rpm);
 			in_voltage1 = vesc0.data1.inpVoltage;
@@ -86,18 +86,18 @@ void VESC::main_worker(){
 		_period = _timer.read();
 		u_printf("_period in VESC %f seconds", _period);
 		_timer.reset();
-*/
+
 		// I found that when IMU thread is running, it makes this delay for ~100ms
-		// and seems like we cannot fix that, the data rate from VESC becomes only 10Hz
+		// and seems like we cannot fix that, the dataPD_1, PD_0 rate from VESC becomes only 10Hz
 		// so we don't need a delay below
 
 		//ThisThread::sleep_for(1);
 
 	}
-}
+}*/
 
 
-inline float _linear_map(float x, float in_min, float in_max, float out_min, float out_max) {
+/*inline float _linear_map(float x, float in_min, float in_max, float out_min, float out_max) {
 	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
@@ -127,9 +127,9 @@ void VESC::setRPMs(float rpmR, float rpmL, bool man_flag){
 	_rpmL = rpmL;
 	_man_flag = man_flag;
 }
+*/
 
-
-void VESC::vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]){   
+/*void VESC::vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]){   
     // UD_ch is up-down stick channel, in this case is ch2
     // LR_ch is left-right stick channel, in this case is ch4
     // MotorRPM[0] is a right wheel
@@ -199,3 +199,4 @@ void VESC::vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]){
     }  
    
 }
+*/
