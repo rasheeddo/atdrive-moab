@@ -187,8 +187,14 @@ class VescUart
 		uint8_t _vesc0Buf[78];
 		uint8_t _vesc1Buf[78];
 
+#ifdef _XWHEELS
+		float _ERPM_ratio = 140.0;   // for big wheels (XWheels's hub)  1 RPM -> 140 ERPM
+									 // for small off-road tire (Flipsky's wheels set)  1 RPM -> 33.333 ERPM
+#endif
+#ifdef _OFFROAD
 		float _ERPM_ratio = 33.333;   // for big wheels (XWheels's hub)  1 RPM -> 140 ERPM
 									 // for small off-road tire (Flipsky's wheels set)  1 RPM -> 33.333 ERPM
+#endif
 		float MAX_DUTY = 1.0;
 
 		float _period;

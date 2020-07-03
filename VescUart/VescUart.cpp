@@ -76,7 +76,7 @@ void VescUart::main_worker(){
 
 		// set command to ask for a speed (getVescValues)
 		recvUartWorker();
-		//_usb_debug->printf("rpm0: %f   rpm1:%f \n", data.rpm, data1.rpm);
+		_usb_debug->printf("rpm0: %f   rpm1:%f \n", data.rpm, data1.rpm);
 
 		//////////////////////////////////// REPORT SPEED FEEDBACK //////////////////////////////
 		int retval = _sock->sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_VESC, 
