@@ -80,8 +80,8 @@ class VescUart
         int MIN_STICK = 283;     
         int MAX_STICK = 1758;    
 
-        int MIN_DEADBAND = 924;
-        int MAX_DEADBAND = 1124;
+        int MIN_DEADBAND = 964;			//924;
+        int MAX_DEADBAND = 1084;		//1124;
 
         int MID_STICK = 1024;
         int DIVIDER = 2;           		// a divider of another wheel's speed, 

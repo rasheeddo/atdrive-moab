@@ -25,12 +25,39 @@ void VescUart::Start() {
 
 void VescUart::_Serial_Rx_Interrupt(){
 
+	uint8_t c;
+
 	while(_uart->readable()) {
 
-		_ringBuf[_count] = _uart->getc();
-		_readyToParse = false; 	// while there is a data readable, stop parse the packets
-		_count++;
+		c = _uart->getc();
 
+		// similar with XWheel Rx_interrupt
+		// I found that sometime my header byte [0] 0x02 or length byte [1] 0x49 were misordered
+		// and that makes parsing data collapse
+		// also the second half of buffer from 78 to 155
+		if ((_count == 0 && c != 0x02) || (_count == 1 && c != 0x49) || (_count == 77 && c != 0x03) ||
+			(_count == 78 && c != 0x02) || (_count == 79 && c != 0x49) || (_count == 155 && c != 0x03)){
+			// reset counter
+			_count = 0;
+			// clear all data in array buffer 
+			// check this https://stackoverflow.com/questions/13308216/how-do-i-clear-a-c-array
+			std::fill_n(_ringBuf, _RING_BUFFER_SIZE, 0);
+			// stop read anything and get out now!
+			break;
+
+		} else {
+
+			// here is normal situation
+			_ringBuf[_count] = c;
+			_readyToParse = false; 	// while there is a data readable, stop parse the packets
+			_count++;
+		}
+
+		//// NOTE ////
+		// there is one FSESC6.6 that Rx-UART has some noises which shown 0xFF on logic analyzer
+		// I think that also make the reading mess up sometime
+		// if it happend, we just break out from interrupt loop like above if-state
+		
 		if (_count >= _RING_BUFFER_SIZE) {
 			_count = 0; //_ringBuf->push(c);
 			_readyToParse = true;	// start parse the packet when interrupt finished reading
@@ -53,7 +80,9 @@ void VescUart::main_worker(){
 
 #ifdef _XWHEELS
 			setDuty(RPM_TO_DUTY(_rpmR));
+			//ThisThread::sleep_for(1);
 			setDuty(RPM_TO_DUTY(_rpmL),1);
+			//ThisThread::sleep_for(1);
 #endif
 #ifdef _OFFROAD
 			setRPM(RPM_TO_ERPM(_rpmR));
@@ -73,18 +102,14 @@ void VescUart::main_worker(){
 		}
 
 		//////////////////////////////////// READ SPEED FEEDBACK /////////////////////////////////
-
-		// set command to ask for a speed (getVescValues)
+		//set command to ask for a speed (getVescValues)
 		recvUartByInterrupt();
 		_timer.stop();
 
 		//////////////////////////////////// REPORT SPEED FEEDBACK //////////////////////////////
-		 int retval = _sock->sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_VESC, 
-		 	(char *) &report_data, sizeof(report_data));
-
-		
+		 
 		_period = _timer.read();
-		u_printf("time read %f seconds", _period);
+		//u_printf("time read %f seconds", _period);
 		_timer.reset();
 	}
 
@@ -108,6 +133,7 @@ void VescUart::recvUartByInterrupt(){
 	float _read_rpmR = 0.0;
 	float _read_rpmL = 0.0;
 
+
 	// ask VESC to get feedback values
 	askForValues();
 	askForValues(1);
@@ -117,9 +143,16 @@ void VescUart::recvUartByInterrupt(){
 	// this is observed from logic analyzer
 	ThisThread::sleep_for(12);
 	
+	// _usb_debug->printf("_ringBuf[0]: %X\n", _ringBuf[0]);
+	// _usb_debug->printf("_ringBuf[1]: %X\n", _ringBuf[1]);
+	// _usb_debug->printf("_ringBuf[77]: %X\n", _ringBuf[77]);
+	// _usb_debug->printf("_ringBuf[78]: %X\n", _ringBuf[78]);
+	// _usb_debug->printf("_ringBuf[79]: %X\n", _ringBuf[79]);
+	// _usb_debug->printf("_ringBuf[155]: %X\n", _ringBuf[155]);
+
 	// the data will be parsed only if the Rx_interrupt finished reading
 	if (_readyToParse){
-
+		NVIC_DisableIRQ(UART4_IRQn);
 		// first half of _ringBuf is right wheel value
 		for(int i=0; i<78; i++){
 			_vesc0Buf[i] = _ringBuf[i];
@@ -128,6 +161,8 @@ void VescUart::recvUartByInterrupt(){
 		for(int i=0; i<78; i++){
 			_vesc1Buf[i] = _ringBuf[78+i];
 		}
+
+		NVIC_EnableIRQ(UART4_IRQn);
 
 		header0 = _vesc0Buf[0];
 		header1 = _vesc1Buf[0];
@@ -164,11 +199,15 @@ void VescUart::recvUartByInterrupt(){
 			report_data._reported_rpmL = _prev_report_rpmL;
 		}
 
+		int retval = _sock->sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_VESC, 
+		 	(char *) &report_data, sizeof(report_data));
+
 		_prev_report_rpmR = _read_rpmR;
 		_prev_report_rpmL = _read_rpmL;
 
 		// _usb_debug->printf("rpmR: %f        rpmL: %f  \n", _read_rpmR, _read_rpmL);		
 	}
+	
 }
 
 int VescUart::receiveUartMessage(uint8_t * payloadReceived) {
