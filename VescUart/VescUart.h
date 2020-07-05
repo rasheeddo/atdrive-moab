@@ -10,6 +10,8 @@
 #include "MOAB_DEFINITIONS.h"
 #include "platform/CircularBuffer.h"
 
+#define _RING_BUFFER_SIZE 156 //156   // 78bytes for each ESC's reply
+
 class VescUart
 {
 	/** Struct to store the telemetry data returned by the VESC */
@@ -61,13 +63,13 @@ class VescUart
         int MID_STICK = 1024;
         int DIVIDER = 2;           		// a divider of another wheel's speed, 
         								// e.g. 2 is half speed of the another wheel's speed
-#ifdef _XWHEELS
+	#ifdef _XWHEELS
         float MAX_RPM = 136.0;          // XWheels -> 136.0
         								// Flipsky's wheels -> I guess even >500 but keep it safe as 300
-#endif
-#ifdef _OFFROAD
+	#endif
+	#ifdef _OFFROAD
 		float MAX_RPM = 300.0; 
-#endif						 	
+	#endif						 	
         							 	  
         float ZERO_RPM = 0.0;           
 
@@ -85,13 +87,13 @@ class VescUart
         int DIVIDER = 2;           		// a divider of another wheel's speed, 
         								// e.g. 2 is half speed of the another wheel's speed
 
-#ifdef _XWHEELS
+	#ifdef _XWHEELS
         float MAX_RPM = 136.0;          // XWheels -> 136.0
         								// Flipsky's wheels -> I guess even >500 but keep it safe as 300
-#endif
-#ifdef _OFFROAD
+	#endif
+	#ifdef _OFFROAD
 		float MAX_RPM = 300.0; 
-#endif	
+	#endif	
 
         float ZERO_RPM = 0.0;           
 
@@ -107,17 +109,23 @@ class VescUart
 
         Timer _timer;
 
-        // CircularBuffer<char, MUX_BUF_SIZE> *_rxbuf;
-
+        //CircularBuffer<uint8_t, _RING_BUFFER_SIZE> *_ringBuf;
+		
+		//Thread read_thread;
         Thread main_thread;
 
+
         UDPSocket *_sock;
+
+        uint8_t _ringBuf[_RING_BUFFER_SIZE];
 		
 		////////////////////////////////////////////////////////
 		//-------------- My modified functions -------------- //
 		////////////////////////////////////////////////////////
 
         void main_worker();
+
+        //void rx_worker();
 
         void _Serial_Rx_Interrupt();
 
@@ -172,20 +180,15 @@ class VescUart
 
 		void askForValues(int vescID);
 
-		void recvUartWorker();
+		void recvUartByInterrupt();
 
-		#define _RING_BUFFER_SIZE 156   // 78bytes for each ESC's reply
-		
-		uint8_t _ringBuf[_RING_BUFFER_SIZE];
+
 
 		int _count = 0;
-		bool _readyToAsk = true;
+		bool _readyToParse = true;
 		float _rpmR;
 		float _rpmL;
 		bool _man_flag = true;
-
-		uint8_t _vesc0Buf[78];
-		uint8_t _vesc1Buf[78];
 
 #ifdef _XWHEELS
 		float _ERPM_ratio = 140.0;   // for big wheels (XWheels's hub)  1 RPM -> 140 ERPM
@@ -198,6 +201,9 @@ class VescUart
 		float MAX_DUTY = 1.0;
 
 		float _period;
+
+		float _prev_report_rpmR = 0.0;
+		float _prev_report_rpmL = 0.0;
 		
 };
 

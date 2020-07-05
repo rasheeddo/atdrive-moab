@@ -64,7 +64,7 @@ uint16_t sbus_b_forImuPacket = 352;
 IMU_daemon imu_daemon(&tx_sock, &sbus_a_forImuPacket, &sbus_b_forImuPacket);
 GPS_daemon gps_daemon(PE_8, PE_7, &net);
 //RTCM3_daemon rtcm3_daemon(PD_5, PD_6, &tx_sock);
-PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
+//PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
 //MUXBoard_daemon mux_daemon(PD_5, PD_6, &tx_sock);
 
 // Motors:

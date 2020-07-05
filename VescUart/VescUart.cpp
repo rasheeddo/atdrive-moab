@@ -14,26 +14,26 @@ VescUart::VescUart(PinName a, PinName b, UDPSocket *tx_sock){
 	_uart = new RawSerial(_tx_pin, _rx_pin, 115200);
 	_uart->attach(callback(this, &VescUart::_Serial_Rx_Interrupt));
 
-	// _ringBuf = new CircularBuffer<char, _RING_BUFFER_SIZE>;
+	//_ringBuf = new CircularBuffer<uint8_t, _RING_BUFFER_SIZE>;
 
 }
 
 void VescUart::Start() {
 	main_thread.start(callback(this, &VescUart::main_worker));
+	//read_thread.start(callback(this, &VescUart::rx_worker));
 }
 
 void VescUart::_Serial_Rx_Interrupt(){
 
-	//char c;
-
 	while(_uart->readable()) {
 
-		_ringBuf[_count] = _uart->getc(); //c = _uart->getc();
+		_ringBuf[_count] = _uart->getc();
+		_readyToParse = false; 	// while there is a data readable, stop parse the packets
 		_count++;
 
 		if (_count >= _RING_BUFFER_SIZE) {
 			_count = 0; //_ringBuf->push(c);
-			_readyToAsk = true;
+			_readyToParse = true;	// start parse the packet when interrupt finished reading
 		}
 		
 	}
@@ -46,8 +46,8 @@ void VescUart::main_worker(){
 
 	while(true){
 
-		//_timer.start();
-
+		
+		_timer.start();
 		//////////////////////////////////// WRITE SPEED COMMAND //////////////////////////////////
 		if (_man_flag){
 
@@ -75,58 +75,101 @@ void VescUart::main_worker(){
 		//////////////////////////////////// READ SPEED FEEDBACK /////////////////////////////////
 
 		// set command to ask for a speed (getVescValues)
-		recvUartWorker();
-		_usb_debug->printf("rpm0: %f   rpm1:%f \n", data.rpm, data1.rpm);
+		recvUartByInterrupt();
+		_timer.stop();
 
 		//////////////////////////////////// REPORT SPEED FEEDBACK //////////////////////////////
-		int retval = _sock->sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_VESC, 
-			(char *) &report_data, sizeof(report_data));
+		 int retval = _sock->sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_VESC, 
+		 	(char *) &report_data, sizeof(report_data));
 
-		// _timer.stop();
-		// _period = _timer.read();
-		// u_printf("_period in VESC %f seconds", _period);
-		// _timer.reset();
+		
+		_period = _timer.read();
+		u_printf("time read %f seconds", _period);
+		_timer.reset();
 	}
 
 }
 
-void VescUart::recvUartWorker(){
+void VescUart::recvUartByInterrupt(){
 
+	uint8_t _vesc0Buf[78];
+	uint8_t _vesc1Buf[78];
 	uint8_t vesc0_payloadReceived[78];
 	uint8_t vesc1_payloadReceived[78];
+	bool proFlag0;
+	bool proFlag1;
+	uint16_t lenPayload0;
+	uint16_t lenPayload1;
+	uint8_t header0;
+	uint8_t header1;
+	bool vesc0_unpacked = false;
+	bool vesc1_unpacked = false;
+	uint8_t c;
+	float _read_rpmR = 0.0;
+	float _read_rpmL = 0.0;
 
-	if (_readyToAsk){
-		askForValues();
-		//ThisThread::sleep_for(0.5);
-		askForValues(1);
-		//ThisThread::sleep_for(0.5);
-		_readyToAsk = false;
-	} else{
+	// ask VESC to get feedback values
+	askForValues();
+	askForValues(1);
+	// a delay below is to help not to mess up the data buffer of _ringBuf
+	// previously I don't have this delay, sometime data of right wheel was mixing with left wheel
+	// and I got wrong RPMs feedback, so 12ms delay make the interrupt stop for 1ms for each read
+	// this is observed from logic analyzer
+	ThisThread::sleep_for(12);
+	
+	// the data will be parsed only if the Rx_interrupt finished reading
+	if (_readyToParse){
 
-		// what I want to do here is just copy first half of _ringBuf as ves0Buf
-		// and second half as vesc1Buf, there might be a std function to do this I think
-		for (int i=0; i<78; i++){
+		// first half of _ringBuf is right wheel value
+		for(int i=0; i<78; i++){
 			_vesc0Buf[i] = _ringBuf[i];
 		}
-		for (int i=0; i<78; i++){
-			_vesc1Buf[i] = _ringBuf[i+78];
+		// second half is for left wheel value
+		for(int i=0; i<78; i++){
+			_vesc1Buf[i] = _ringBuf[78+i];
 		}
 
+		header0 = _vesc0Buf[0];
+		header1 = _vesc1Buf[0];
 
-		// unpack received data
-		bool vesc0_unpacked = unpackPayload(_vesc0Buf, 78, vesc0_payloadReceived);
-		bool vesc1_unpacked = unpackPayload(_vesc1Buf, 78, vesc1_payloadReceived);
+		lenPayload0 = _vesc0Buf[1];
+		lenPayload1 = _vesc1Buf[1];
 
-		// parse byte data to struct as user can use
-		bool proFlag0 = processReadPacket(vesc0_payloadReceived);
-		bool proFlag1 = processReadPacket(vesc1_payloadReceived, 1);
+		// _usb_debug->printf("_vesc0Buf[0]: %X\n", _vesc0Buf[0]);
+		// _usb_debug->printf("_vesc0Buf[1]: %X\n", _vesc0Buf[1]);
+		// _usb_debug->printf("_vesc1Buf[0]: %X\n", _vesc1Buf[0]);
+		// _usb_debug->printf("_vesc1Buf[1]: %X\n", _vesc1Buf[1]);
 
-		report_data._reported_rpmR = ERPM_TO_RPM(data.rpm);
-		report_data._reported_rpmL = ERPM_TO_RPM(data1.rpm);
+		// _usb_debug->printf("len0: %d\n", lenPayload0);
+		// _usb_debug->printf("len1: %d\n", lenPayload1);
 
+		// header and length of replied packets always 2 and 73 
+		if (header0 == 2 && lenPayload0 == 73) {
+			vesc0_unpacked = unpackPayload(_vesc0Buf, 78, vesc0_payloadReceived);
+			proFlag0 = processReadPacket(vesc0_payloadReceived);
+			
+			_read_rpmR = ERPM_TO_RPM(data.rpm);
+			report_data._reported_rpmR = _read_rpmR;
+
+		} else{
+			report_data._reported_rpmR = _prev_report_rpmR;
+		}
+		
+		if (header1 == 2 && lenPayload1 == 73) {
+			vesc1_unpacked = unpackPayload(_vesc1Buf, 78, vesc1_payloadReceived);
+			proFlag1 = processReadPacket(vesc1_payloadReceived, 1);
+			_read_rpmL = ERPM_TO_RPM(data1.rpm);
+			report_data._reported_rpmL = _read_rpmL;
+		} else{
+			report_data._reported_rpmL = _prev_report_rpmL;
+		}
+
+		_prev_report_rpmR = _read_rpmR;
+		_prev_report_rpmL = _read_rpmL;
+
+		// _usb_debug->printf("rpmR: %f        rpmL: %f  \n", _read_rpmR, _read_rpmL);		
 	}
 }
-
 
 int VescUart::receiveUartMessage(uint8_t * payloadReceived) {
 
