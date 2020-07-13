@@ -10,27 +10,30 @@
 #include "MOAB_DEFINITIONS.h"
 #include "platform/CircularBuffer.h"
 
-#define _RING_BUFFER_SIZE 156 //156   // 78bytes for each ESC's reply
+#define _RING_BUFFER_SIZE 624 //156   // 78bytes for each ESC's reply
+#define _VESC_RECV_BYTES 78
+
+
 
 class VescUart
 {
 	/** Struct to store the telemetry data returned by the VESC */
 	struct dataPackage {
-		float avgMotorCurrent;
-		float avgInputCurrent;
-		float dutyCycleNow;
-		float rpm;
-		float inpVoltage;
-		float ampHours;
-		float ampHoursCharged;
-		long tachometer;
-		long tachometerAbs;
-	};
+			float avgMotorCurrent;
+			float avgInputCurrent;
+			float dutyCycleNow;
+			float rpm;
+			float inpVoltage;
+			float ampHours;
+			float ampHoursCharged;
+			long tachometer;
+			long tachometerAbs;
+		};
 
 	struct vesc_data{
-		float _reported_rpmR;
-		float _reported_rpmL;
-	};
+			float _reported_rpmR;
+			float _reported_rpmL;
+		};
 
 	public:
 
@@ -109,7 +112,9 @@ class VescUart
 
         Timer _timer;
 
-        //CircularBuffer<uint8_t, _RING_BUFFER_SIZE> *_ringBuf;
+        CircularBuffer<uint8_t, _RING_BUFFER_SIZE> *_ringBuf;
+
+        //uint8_t _ringBuf[_RING_BUFFER_SIZE];
 		
 		//Thread read_thread;
         Thread main_thread;
@@ -117,8 +122,6 @@ class VescUart
 
         UDPSocket *_sock;
 
-        uint8_t _ringBuf[_RING_BUFFER_SIZE];
-		
 		////////////////////////////////////////////////////////
 		//-------------- My modified functions -------------- //
 		////////////////////////////////////////////////////////
@@ -182,10 +185,10 @@ class VescUart
 
 		void recvUartByInterrupt();
 
-
+		float getRPMFormPacket(uint8_t * message);
 
 		int _count = 0;
-		bool _readyToParse = true;
+		bool _readyToParse = false;
 		float _rpmR;
 		float _rpmL;
 		bool _man_flag = true;

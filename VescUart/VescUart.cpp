@@ -14,13 +14,12 @@ VescUart::VescUart(PinName a, PinName b, UDPSocket *tx_sock){
 	_uart = new RawSerial(_tx_pin, _rx_pin, 115200);
 	_uart->attach(callback(this, &VescUart::_Serial_Rx_Interrupt));
 
-	//_ringBuf = new CircularBuffer<uint8_t, _RING_BUFFER_SIZE>;
+	_ringBuf = new CircularBuffer<uint8_t, _RING_BUFFER_SIZE>;
 
 }
 
 void VescUart::Start() {
 	main_thread.start(callback(this, &VescUart::main_worker));
-	//read_thread.start(callback(this, &VescUart::rx_worker));
 }
 
 void VescUart::_Serial_Rx_Interrupt(){
@@ -35,7 +34,7 @@ void VescUart::_Serial_Rx_Interrupt(){
 		// I found that sometime my header byte [0] 0x02 or length byte [1] 0x49 were misordered
 		// and that makes parsing data collapse
 		// also the second half of buffer from 78 to 155
-		if ((_count == 0 && c != 0x02) || (_count == 1 && c != 0x49) || (_count == 77 && c != 0x03) ||
+		/*if ((_count == 0 && c != 0x02) || (_count == 1 && c != 0x49) || (_count == 77 && c != 0x03) ||
 			(_count == 78 && c != 0x02) || (_count == 79 && c != 0x49) || (_count == 155 && c != 0x03)){
 			// reset counter
 			_count = 0;
@@ -51,18 +50,34 @@ void VescUart::_Serial_Rx_Interrupt(){
 			_ringBuf[_count] = c;
 			_readyToParse = false; 	// while there is a data readable, stop parse the packets
 			_count++;
-		}
+		}*/
 
+
+		// _ringBuf[_count] = c;
+		// _count++;
+		// _readyToParse = false;
+
+		// I tried a lot of stuff, but this CircularBuffer worked the best for me
+		// the other I commented it out as you can see, and leave it as the history of my mistake
+		if (_ringBuf->full() == false){
+			_ringBuf->push(c);
+		}
+		
 		//// NOTE ////
 		// there is one FSESC6.6 that Rx-UART has some noises which shown 0xFF on logic analyzer
 		// I think that also make the reading mess up sometime
 		// if it happend, we just break out from interrupt loop like above if-state
+
+		// if (_count == 156){
+		// 	_readyToParse = true;	// start parse the packet when interrupt finished reading
+		// }
 		
-		if (_count >= _RING_BUFFER_SIZE) {
-			_count = 0; //_ringBuf->push(c);
-			_readyToParse = true;	// start parse the packet when interrupt finished reading
-		}
-		
+
+		// if (_count >= _RING_BUFFER_SIZE) {
+		// 	_readyToParse = true;
+		// 	_count = 0; //_ringBuf->push(c);
+			
+		// }
 	}
 
 }
@@ -109,8 +124,9 @@ void VescUart::main_worker(){
 		//////////////////////////////////// REPORT SPEED FEEDBACK //////////////////////////////
 		 
 		_period = _timer.read();
-		//u_printf("time read %f seconds", _period);
+		//_usb_debug->printf("time read %f seconds\n", _period);
 		_timer.reset();
+
 	}
 
 }
@@ -121,94 +137,131 @@ void VescUart::recvUartByInterrupt(){
 	uint8_t _vesc1Buf[78];
 	uint8_t vesc0_payloadReceived[78];
 	uint8_t vesc1_payloadReceived[78];
-	bool proFlag0;
-	bool proFlag1;
-	uint16_t lenPayload0;
-	uint16_t lenPayload1;
-	uint8_t header0;
-	uint8_t header1;
+
 	bool vesc0_unpacked = false;
 	bool vesc1_unpacked = false;
-	uint8_t c;
+	uint8_t data;
 	float _read_rpmR = 0.0;
 	float _read_rpmL = 0.0;
 
+	int idx = 0;
 
-	// ask VESC to get feedback values
+	bool _vesc0GoodPacket = false;
+	bool _vesc1GoodPacket = false;
+
+	bool set_print0 = false;
+	bool set_print1 = false;
+
+
+	/////////////////////////// VESC 0 RECEIVE //////////////////////////////
 	askForValues();
-	askForValues(1);
-	// a delay below is to help not to mess up the data buffer of _ringBuf
-	// previously I don't have this delay, sometime data of right wheel was mixing with left wheel
-	// and I got wrong RPMs feedback, so 12ms delay make the interrupt stop for 1ms for each read
-	// this is observed from logic analyzer
-	ThisThread::sleep_for(12);
-	
-	// _usb_debug->printf("_ringBuf[0]: %X\n", _ringBuf[0]);
-	// _usb_debug->printf("_ringBuf[1]: %X\n", _ringBuf[1]);
-	// _usb_debug->printf("_ringBuf[77]: %X\n", _ringBuf[77]);
-	// _usb_debug->printf("_ringBuf[78]: %X\n", _ringBuf[78]);
-	// _usb_debug->printf("_ringBuf[79]: %X\n", _ringBuf[79]);
-	// _usb_debug->printf("_ringBuf[155]: %X\n", _ringBuf[155]);
 
-	// the data will be parsed only if the Rx_interrupt finished reading
-	if (_readyToParse){
-		NVIC_DisableIRQ(UART4_IRQn);
-		// first half of _ringBuf is right wheel value
-		for(int i=0; i<78; i++){
-			_vesc0Buf[i] = _ringBuf[i];
-		}
-		// second half is for left wheel value
-		for(int i=0; i<78; i++){
-			_vesc1Buf[i] = _ringBuf[78+i];
-		}
-
-		NVIC_EnableIRQ(UART4_IRQn);
-
-		header0 = _vesc0Buf[0];
-		header1 = _vesc1Buf[0];
-
-		lenPayload0 = _vesc0Buf[1];
-		lenPayload1 = _vesc1Buf[1];
-
-		// _usb_debug->printf("_vesc0Buf[0]: %X\n", _vesc0Buf[0]);
-		// _usb_debug->printf("_vesc0Buf[1]: %X\n", _vesc0Buf[1]);
-		// _usb_debug->printf("_vesc1Buf[0]: %X\n", _vesc1Buf[0]);
-		// _usb_debug->printf("_vesc1Buf[1]: %X\n", _vesc1Buf[1]);
-
-		// _usb_debug->printf("len0: %d\n", lenPayload0);
-		// _usb_debug->printf("len1: %d\n", lenPayload1);
-
-		// header and length of replied packets always 2 and 73 
-		if (header0 == 2 && lenPayload0 == 73) {
-			vesc0_unpacked = unpackPayload(_vesc0Buf, 78, vesc0_payloadReceived);
-			proFlag0 = processReadPacket(vesc0_payloadReceived);
-			
-			_read_rpmR = ERPM_TO_RPM(data.rpm);
-			report_data._reported_rpmR = _read_rpmR;
-
-		} else{
-			report_data._reported_rpmR = _prev_report_rpmR;
-		}
+	// this while loop will pop the data from FIFO buffer out
+	while(_ringBuf->empty() == false){
 		
-		if (header1 == 2 && lenPayload1 == 73) {
-			vesc1_unpacked = unpackPayload(_vesc1Buf, 78, vesc1_payloadReceived);
-			proFlag1 = processReadPacket(vesc1_payloadReceived, 1);
-			_read_rpmL = ERPM_TO_RPM(data1.rpm);
-			report_data._reported_rpmL = _read_rpmL;
-		} else{
-			report_data._reported_rpmL = _prev_report_rpmL;
+		// pop and store to local buffer
+		_ringBuf->pop(data);
+		_vesc0Buf[idx] = data;
+
+		idx++;
+
+		// vesc feedback values are only 78bytes
+		if (idx >= _VESC_RECV_BYTES){
+			set_print0 = true;
+			idx = 0;
+			break;
 		}
 
-		int retval = _sock->sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_VESC, 
-		 	(char *) &report_data, sizeof(report_data));
+		set_print0 = false;
 
-		_prev_report_rpmR = _read_rpmR;
-		_prev_report_rpmL = _read_rpmL;
-
-		// _usb_debug->printf("rpmR: %f        rpmL: %f  \n", _read_rpmR, _read_rpmL);		
 	}
 	
+	// This is to check that our local buffer _vesc0Buf got a correct packet
+	if (_vesc0Buf[0] != 0x02 || _vesc0Buf[1] != 0x49 || _vesc0Buf[77] != 0x03){
+		// sometime there is some noise mixed up with our Rx data,
+		// and it messed up all the packet sequence, so just reset the ring buffer
+		_ringBuf->reset();
+		_usb_debug->printf("________________Reset Buffer 0______________\n");
+		_vesc0GoodPacket = false;
+	} else{
+		_vesc0GoodPacket = true;
+	}
+
+	// some of delay make the data not collapse and misordered
+	ThisThread::sleep_for(8);
+
+	////////////////////////////////// VESC 1 RECEIVE ///////////////////////////////////////
+	askForValues(1);
+
+	while(_ringBuf->empty() == false){
+
+		// pop and store to local buffer
+		_ringBuf->pop(data);
+		_vesc1Buf[idx] = data;
+
+		idx++;
+
+		// vesc feedback values are only 78bytes
+		if (idx >= _VESC_RECV_BYTES){
+			set_print1 = true;
+			idx = 0;
+			break;
+		}
+
+		set_print1 = false;
+
+	}
+
+	// This is to check that our local buffer _vesc0Buf got a correct packet
+	if (_vesc1Buf[0] != 0x02 || _vesc1Buf[1] != 0x49 || _vesc1Buf[77] != 0x03){
+		// sometime there is some noise mixed up with our Rx data,
+		// and it messed up all the packet sequence, so just reset the ring buffer
+		_ringBuf->reset();
+		_usb_debug->printf("________________Reset Buffer 1_____________\n");
+		_vesc1GoodPacket = false;
+	} else{
+		_vesc1GoodPacket = true;
+	}
+
+	//////////////////////////   PARSE DATA and REPORT   ////////////////////////////////
+
+	if (_vesc0GoodPacket){
+		vesc0_unpacked = unpackPayload(_vesc0Buf, 78, vesc0_payloadReceived);
+		_read_rpmR = getRPMFormPacket(vesc0_payloadReceived);
+		_read_rpmR = ERPM_TO_RPM(_read_rpmR);
+		report_data._reported_rpmR = _read_rpmR;
+	} else {
+		report_data._reported_rpmR = _prev_report_rpmR;
+	}
+
+	if (_vesc1GoodPacket){
+		vesc1_unpacked = unpackPayload(_vesc1Buf, 78, vesc1_payloadReceived);
+		_read_rpmL = getRPMFormPacket(vesc1_payloadReceived);
+		_read_rpmL = ERPM_TO_RPM(_read_rpmL);
+		report_data._reported_rpmL = _read_rpmL;
+	} else{
+		report_data._reported_rpmL = _prev_report_rpmL;
+	}
+
+	int retval = _sock->sendto(_AUTOPILOT_IP_ADDRESS, UDP_PORT_VESC, 
+		(char *) &report_data, sizeof(report_data));
+				
+
+	_prev_report_rpmR = report_data._reported_rpmR;
+	_prev_report_rpmL = report_data._reported_rpmL;
+
+	//// For debugging
+	//// if we have this print state we can lower the delay below to 5ms
+	// if (set_print0 && set_print1){
+	// 	_usb_debug->printf("0[0]: %X 0[1]: %X 0[77]: %X    1[0]: %X 1[1]: %X 1[77]: %X   _read_rpmR: %f _read_rpmL: %f\n",
+	// _vesc0Buf[0], _vesc0Buf[1] , _vesc0Buf[77], _vesc1Buf[0], _vesc1Buf[1], _vesc1Buf[77], _read_rpmR, _read_rpmL);
+	// }
+	
+	// some of delay make the data not collapse and misordered, cannot lower than this!
+	ThisThread::sleep_for(8);
+
 }
+
 
 int VescUart::receiveUartMessage(uint8_t * payloadReceived) {
 
@@ -401,6 +454,44 @@ bool VescUart::processReadPacket(uint8_t * message) {
 
 		default:
 			return false;
+		break;
+	}
+}
+
+float VescUart::getRPMFormPacket(uint8_t * message) {
+
+	COMM_PACKET_ID packetId;
+	int32_t ind = 0;
+
+	packetId = (COMM_PACKET_ID)message[0];
+	message++; // Removes the packetId from the actual message (payload)
+
+	float current;
+	float inputCurret;
+	float dutyCycle;
+	float rpm;
+
+	switch (packetId){
+		case COMM_GET_VALUES: // Structure defined here: https://github.com/vedderb/bldc/blob/43c3bbaf91f5052a35b75c2ff17b5fe99fad94d1/commands.c#L164
+
+			ind = 4; // Skip the first 4 bytes 
+			current = buffer_get_float32(message, 100.0, &ind);
+			inputCurret = buffer_get_float32(message, 100.0, &ind);
+			ind += 8; // Skip the next 8 bytes
+			dutyCycle = buffer_get_float16(message, 1000.0, &ind);
+			rpm = buffer_get_int32(message, &ind);
+			// data.inpVoltage 		= buffer_get_float16(message, 10.0, &ind);
+			// data.ampHours 			= buffer_get_float32(message, 10000.0, &ind);
+			// data.ampHoursCharged 	= buffer_get_float32(message, 10000.0, &ind);
+			// ind += 8; // Skip the next 8 bytes 
+			// data.tachometer 		= buffer_get_int32(message, &ind);
+			// data.tachometerAbs 		= buffer_get_int32(message, &ind);
+			return rpm;
+
+		break;
+
+		default:
+			return NULL;
 		break;
 	}
 }
@@ -660,7 +751,7 @@ void VescUart::vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]){
     // user push ch4 left or right, UGV turns left or right, two wheels same speed but reverse direction
     else if(UD_ch <= MAX_DEADBAND && UD_ch >= MIN_DEADBAND && (LR_ch >= MAX_DEADBAND || LR_ch <= MIN_DEADBAND))
     {
-        MotorRPM[1] = (float)_linear_map(LR_ch, MIN_STICK, MAX_STICK, -MAX_RPM/2, MAX_RPM/2);
+        MotorRPM[1] = (float)_linear_map(LR_ch, MIN_STICK, MAX_STICK, -MAX_RPM, MAX_RPM);
         MotorRPM[0] = -MotorRPM[1];
     }
     /////////////////////////////////////////////////////////// CURVES /////////////////////////////////////////////////////////////////////
