@@ -203,12 +203,11 @@ void set_mode_manual() {
 #ifdef _FUTABA
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
-	//vesc.vehicleControl_Percent(sbup.ch2, sbup.ch4, motorPercent);
-	vesc.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
+	vesc.vehicleControlProportionalMixing(sbup.ch2, sbup.ch4, motorRPM);
+	//vesc.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
 #endif
 
 	vesc.setRPMs(motorRPM[0], motorRPM[1], true);
-	//vesc.setPercents(motorPercent[0], motorPercent[1]);
 }
 
 void set_mode_auto() {
@@ -228,7 +227,6 @@ void set_mode_auto() {
 	drive.setRPMs(rightRPM, leftRPM);
 	*/
 	vesc.setRPMs(rpmR,rpmL, false);
-	//vesc.setPercents(rpmR,rpmL);
 
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;

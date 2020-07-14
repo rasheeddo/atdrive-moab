@@ -55,6 +55,9 @@ class VescUart
 		// convert SBUS stick value to motor RPM of each wheel
 		void vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]);
 
+		void vehicleControlProportionalMixing(int UD_ch, int LR_ch, float MotorRPM[2]);
+
+
 #ifdef _FUTABA
 
         int MIN_STICK = 360;       
@@ -203,10 +206,14 @@ class VescUart
 #endif
 		float MAX_DUTY = 1.0;
 
+		float PREV_SPEED;
+
 		float _period;
 
 		float _prev_report_rpmR = 0.0;
 		float _prev_report_rpmL = 0.0;
+
+		float _pre_Y;
 		
 };
 

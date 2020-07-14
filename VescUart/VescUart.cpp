@@ -792,3 +792,63 @@ void VescUart::vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]){
     }  
    
 }
+
+void VescUart::vehicleControlProportionalMixing(int UD_ch, int LR_ch, float MotorRPM[2]){   
+    // UD_ch is up-down stick channel, in this case is ch2
+    // LR_ch is left-right stick channel, in this case is ch4
+    // MotorRPM[0] is a right wheel
+    // MotorRPM[1] is a left wheel
+
+	// I followed the method from this video 
+	// https://www.youtube.com/watch?v=t1NSeMTVRH8
+
+	// the speed changing is smooth, but just curvy backward is opposite
+
+    float y = (float)_linear_map(UD_ch, MIN_STICK, MAX_STICK, -100.0, 100.0);
+    float x = (float)_linear_map(LR_ch, MIN_STICK, MAX_STICK, -100.0, 100.0);
+
+    float left = y+x;
+    float right = y-x;
+
+    float diff = abs(x) - abs(y);
+
+    float swap;
+
+
+    if (left < 0.0){
+    	left = left - abs(diff);
+    } else{
+    	left = left + abs(diff);
+    }
+
+
+    if (right < 0.0){
+    	right = right - abs(diff);
+    } else{
+    	right = right + abs(diff);
+    }
+
+    // This is in case correct curvy backward, but it doesn't smooth, when suddenly changes
+    // if (_pre_Y < 0.0){
+    // 	swap = left;
+    // 	left = right;
+    // 	right = swap;
+    // }
+    // _pre_Y = y;
+
+    // some deadband
+   	if (abs(left) < 2.0){
+   		left = 0.0;
+   	}
+   	if (abs(right) < 2.0){
+   		right = 0.0;
+   	}
+
+    //left = _linear_map(left, -200.0, 200.0, -100.0, 100.0);
+    //right = _linear_map(right, -200.0, 200.0, -100.0, 100.0);
+
+    MotorRPM[0] = _linear_map(right, -200.0, 200.0, -MAX_RPM, MAX_RPM);
+	MotorRPM[1] = _linear_map(left, -200.0, 200.0, -MAX_RPM, MAX_RPM);
+	
+    //_usb_debug->printf("left: %f   right: %f   \n", left, right);
+}
