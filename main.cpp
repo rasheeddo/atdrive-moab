@@ -24,7 +24,7 @@
 #include "daemons/GPS_daemon.hpp"
 #include "daemons/RTCM3_daemon.hpp"
 #include "daemons/PushButton_daemon.hpp"
-#include "daemons/MUXBoard_daemon.hpp"
+//#include "daemons/MUXBoard_daemon.hpp"
 #include "SbusParser.hpp"
 //#include "MotorControl.hpp"
 //#include "XWheels.hpp"
@@ -63,14 +63,14 @@ uint16_t sbus_b_forImuPacket = 352;
 IMU_daemon imu_daemon(&tx_sock, &sbus_a_forImuPacket, &sbus_b_forImuPacket);
 GPS_daemon gps_daemon(PE_8, PE_7, &net);
 //RTCM3_daemon rtcm3_daemon(PD_5, PD_6, &tx_sock);
-PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
-MUXBoard_daemon mux_daemon(PD_5, PD_6, &tx_sock);
+//PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
+//MUXBoard_daemon mux_daemon(PD_5, PD_6, &tx_sock);
 
 // Motors:
 //MotorControl motorControl(PD_14, PD_15);
 //XWheels drive(PD_1, PD_0);
 Attler attler(PD_14, PD_15);
-float motorRPM[2];
+//float motorRPM[2];
 
 // S.Bus is 100000Hz, 8E2, electrically inverted
 RawSerial sbus_in(NC, PD_2, 100000);  // tx, then rx
@@ -94,10 +94,10 @@ void u_printf(const char *fmt, ...) {
 }
 
 
-//uint16_t auto_ch1 = 1024;
-//uint16_t auto_ch2 = 1024;
-float rpmR_percent;		//float rpmR;
-float rpmL_percent;		//float rpmL; 
+uint16_t auto_steer = 1024;
+uint16_t auto_throt = 1024;
+//float rpmR_percent;		//float rpmR;
+//float rpmL_percent;		//float rpmL; 
 void udp_rx_worker() {
 	/*
 	 * Here we receive throttle and steering control from the auto-pilot computer
@@ -106,8 +106,7 @@ void udp_rx_worker() {
 	char inputBuffer[33];
 	inputBuffer[32] = 0;
 	uint64_t _last_autopilot = 0;
-	float *control = (float *) &(inputBuffer[0]);
-	//uint16_t *control = (uint16_t *) &(inputBuffer[0]);
+	uint16_t *control = (uint16_t *) &(inputBuffer[0]);
 
 	rx_sock.set_blocking(true);
 	rx_sock.set_timeout(500);
@@ -117,17 +116,17 @@ void udp_rx_worker() {
 		int n = rx_sock.recvfrom(&sockAddr, inputBuffer, 64);
 		uint64_t ts = rtos::Kernel::get_ms_count();
 		if (ts - _last_autopilot > 500) {
-			if (rpmR_percent != 0.0 || rpmL_percent != 0.0) {
+			if (auto_steer != 1024 || auto_throt != 1024) {
 				u_printf("Timeout: resetting auto sbus values\n");
-				rpmR_percent = 0.0;  //rpmR = drive.ZERO_RPM;		//auto_ch1 = 1024;
-				rpmL_percent = 0.0;  //rpmL = drive.ZERO_RPM;		//auto_ch2 = 1024;
+				auto_steer = 1024;
+				auto_throt = 1024;
 			}
 		}
 
-		if (n == 2*sizeof(float)) {
+		if (n == 2*sizeof(uint16_t)) {
 			_last_autopilot = ts;
-			rpmR_percent = control[0];		//rpmR = control[0];		//auto_ch1 = control[0];
-			rpmL_percent = control[1];		//rpmL = control[1];		//auto_ch2 = control[1];	
+			auto_steer = control[0];		//rpmR = control[0];		//auto_ch1 = control[0];
+			auto_throt = control[1];		//rpmL = control[1];		//auto_ch2 = control[1];	
 		} else if (n > 0) {
 			inputBuffer[n] = 0;
 			printf("rx %d bytes:\r\n", n);
@@ -153,9 +152,10 @@ void set_mode_sbus_failsafe() {
 	//motorControl.set_steering(1024);
 	//motorControl.set_throttle(352);
 	//drive.setRPMs(drive.ZERO_RPM, drive.ZERO_RPM);
-	attler.set_steering_and_throttle(1024, 1024);
+	attler.set_steering(1024);
+	attler.set_throttle(1024);
 	sbus_a_forImuPacket = 1024;
-	sbus_b_forImuPacket = 352;
+	sbus_b_forImuPacket = 1024;
 }
 
 void set_mode_stop() {
@@ -166,46 +166,38 @@ void set_mode_stop() {
 	//motorControl.set_steering(sbup.ch1);
 	//motorControl.set_throttle(352);
 	//drive.setRPMs(drive.ZERO_RPM, drive.ZERO_RPM);
-	attler.set_steering_and_throttle(1024, 1024);
+	attler.set_steering(1024);
+	attler.set_throttle(1024);
 	sbus_a_forImuPacket = 1024;
-	sbus_b_forImuPacket = 352;
+	sbus_b_forImuPacket = 1024;
 }
 
 void set_mode_manual() {
 	myledR = 0;
 	myledG = 1;
 	myledB = 0;
-	/*
-	float leftWheel = 0;
-	float rightWheel = 0;
 
-	calc_sbus_to_skid_mode(sbup.ch1, sbup.ch3, &leftWheel, &rightWheel);
-
-	float leftRPM = 144 * leftWheel;
-	float rightRPM = 144 * rightWheel;
-
-	//u_printf("manual motor: %f %f\n", leftRPM, rightRPM);
-	drive.setRPMs(rightRPM, leftRPM);
-	*/
 #ifdef _KO_PROPO
-	sbus_a_forImuPacket = sbup.ch2;
-	sbus_b_forImuPacket = sbup.ch3;
-	attler.set_steering_and_throttle(sbup.ch3, sbup.ch2);	//drive.vehicleControl(sbup.ch3, sbup.ch2, motorRPM);
+	sbus_a_forImuPacket = sbup.ch3;
+	sbus_b_forImuPacket = sbup.ch2;
+	attler.set_steering(sbup.ch3);
+	attler.set_throttle(sbup.ch2);
 #endif
 
 #ifdef _LTE_PROPO
-	sbus_a_forImuPacket = sbup.ch1;
-	sbus_b_forImuPacket = sbup.ch2;
-	attler.set_steering_and_throttle(sbup.ch2, sbup.ch1);	//drive.vehicleControl(sbup.ch2, sbup.ch1, motorRPM);
+	sbus_a_forImuPacket = sbup.ch2;
+	sbus_b_forImuPacket = sbup.ch1;
+	attler.set_steering(sbup.ch2);
+	attler.set_throttle(sbup.ch1);
 #endif
 
 #ifdef _FUTABA
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
-	attler.set_steering_and_throttle(sbup.ch4, sbup.ch2);	//drive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
+	attler.set_steering(sbup.ch4);
+	attler.set_throttle(sbup.ch2);
 #endif
 
-	//drive.setRPMs(motorRPM[0],motorRPM[1]);
 }
 
 void set_mode_auto() {
@@ -225,9 +217,11 @@ void set_mode_auto() {
 	drive.setRPMs(rightRPM, leftRPM);
 	*/
 	//drive.setRPMs(rpmR,rpmL);
-	attler.driveVehicle(attler.L_DIR*rpmL_percent, attler.R_DIR*rpmR_percent);
+	attler.set_steering(auto_steer);
+	attler.set_throttle(auto_throt);
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
+	//u_printf("steer: %d   throt: %d", auto_steer, auto_throt);
 }
 
 
@@ -427,8 +421,8 @@ int main() {
 	imu_daemon.Start();  // will start a separate thread
 	gps_daemon.Start();  // will start a separate thread
 	//rtcm3_daemon.Start();  // will start a separate thread
-	pushButton_daemon.Start();  // will start a separate thread
-	mux_daemon.Start();
+	//pushButton_daemon.Start();  // will start a separate thread
+	//mux_daemon.Start();
 
 	//drive.Start(); // will start a separate thread
 
