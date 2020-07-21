@@ -28,8 +28,8 @@
 #include "SbusParser.hpp"
 //#include "MotorControl.hpp"
 //#include "XWheels.hpp"
-#include "VescUart/VescUart.h"
-
+//#include "Vesc/VescUart.h"
+#include "Vesc/VescCAN.hpp"
 
 EventFlags event_flags;
 
@@ -70,9 +70,9 @@ GPS_daemon gps_daemon(PE_8, PE_7, &net);
 // Motors:
 //MotorControl motorControl(PD_14, PD_15);
 //XWheels drive(PD_1, PD_0);
-VescUart vesc(PD_1, PD_0, &tx_sock);
+VescCan vesc(PB_5,PB_6, &tx_sock);   //CAN2		//VescUart vesc(PD_1, PD_0, &tx_sock);
 float motorRPM[2];
-float motorPercent[2];
+
 // S.Bus is 100000Hz, 8E2, electrically inverted
 RawSerial sbus_in(NC, PD_2, 100000);  // tx, then rx
 
@@ -207,7 +207,7 @@ void set_mode_manual() {
 	//vesc.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
 #endif
 
-	vesc.setRPMs(motorRPM[0], motorRPM[1], true);
+	vesc.setRPMs(motorRPM[0], motorRPM[1]);
 }
 
 void set_mode_auto() {
@@ -226,7 +226,7 @@ void set_mode_auto() {
 	//u_printf("auto motor: %f %f\n", leftRPM, rightRPM);
 	drive.setRPMs(rightRPM, leftRPM);
 	*/
-	vesc.setRPMs(rpmR,rpmL, false);
+	vesc.setRPMs(rpmR,rpmL);
 
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
