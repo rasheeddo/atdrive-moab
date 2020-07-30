@@ -24,7 +24,7 @@
 #include "daemons/GPS_daemon.hpp"
 #include "daemons/RTCM3_daemon.hpp"
 #include "daemons/PushButton_daemon.hpp"
-#include "daemons/MUXBoard_daemon.hpp"
+//#include "daemons/MUXBoard_daemon.hpp"
 #include "SbusParser.hpp"
 //#include "MotorControl.hpp"
 #include "XWheels.hpp"
@@ -64,7 +64,7 @@ IMU_daemon imu_daemon(&tx_sock, &sbus_a_forImuPacket, &sbus_b_forImuPacket);
 GPS_daemon gps_daemon(PE_8, PE_7, &net);
 //RTCM3_daemon rtcm3_daemon(PD_5, PD_6, &tx_sock);
 PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
-MUXBoard_daemon mux_daemon(PD_5, PD_6, &tx_sock);
+//MUXBoard_daemon mux_daemon(PD_5, PD_6, &tx_sock);
 
 // Motors:
 //MotorControl motorControl(PD_14, PD_15);
@@ -151,7 +151,7 @@ void set_mode_sbus_failsafe() {
 
 	//motorControl.set_steering(1024);
 	//motorControl.set_throttle(352);
-	drive.setRPMs(drive.ZERO_RPM, drive.ZERO_RPM);
+	drive.setRPMs(0.0, 0.0);
 	sbus_a_forImuPacket = 1024;
 	sbus_b_forImuPacket = 352;
 }
@@ -163,7 +163,7 @@ void set_mode_stop() {
 
 	//motorControl.set_steering(sbup.ch1);
 	//motorControl.set_throttle(352);
-	drive.setRPMs(drive.ZERO_RPM, drive.ZERO_RPM);
+	drive.setRPMs(0.0, 0.0);
 	sbus_a_forImuPacket = 1024;
 	sbus_b_forImuPacket = 352;
 }
@@ -193,15 +193,18 @@ void set_mode_manual() {
 #ifdef _LTE_PROPO
 	sbus_a_forImuPacket = sbup.ch1;
 	sbus_b_forImuPacket = sbup.ch2;
-	drive.vehicleControl(sbup.ch2, sbup.ch1, motorRPM);
+	//drive.vehicleControl(sbup.ch2, sbup.ch1, motorRPM);
+	drive.vehicleControlProportionalMixing(sbup.ch2, sbup.ch1, motorRPM);
 #endif
 
 #ifdef _FUTABA
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
-	drive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
+	//drive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
+	drive.vehicleControlProportionalMixing(sbup.ch2, sbup.ch4, motorRPM);
 #endif
 
+	u_printf("ch2 %d  ch4 %d  rpmR %f  rpmL %f ", sbup.ch2, sbup.ch4, motorRPM[0], motorRPM[1]);
 	drive.setRPMs(motorRPM[0],motorRPM[1]);
 }
 
@@ -423,8 +426,8 @@ int main() {
 	imu_daemon.Start();  // will start a separate thread
 	gps_daemon.Start();  // will start a separate thread
 	//rtcm3_daemon.Start();  // will start a separate thread
-	pushButton_daemon.Start();  // will start a separate thread
-	mux_daemon.Start();
+	//pushButton_daemon.Start();  // will start a separate thread
+	//mux_daemon.Start();
 
 	drive.Start(); // will start a separate thread
 

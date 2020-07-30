@@ -30,14 +30,14 @@ XWheels::XWheels(PinName a, PinName b) {
     InitHeader2 = 0x11;     // always constant
     ForwardAcc = 0x32;      // 0x00 to 0x64   [0-100]   An acceleration when changing speed value
     ForwardDelay = 0x00;    // 0x00 t0 0x05   [0-5]     A delay before start to go
-    BrakeDis = 0x0A;        // 0x00 to 0x64   [0-100]   Brake distance, should be as short as possible (rigid brake)
+    BrakeDis = 0x0A;        // 0x01 to 0x64   [0-100]   Brake distance, should be as short as possible (rigid brake), DONT'T PUT 0x00
     TurnAcc = 0x32;         // 0x00 to 0x64   [0-100]   Turning acceleration, when two wheels has reverse direction
     TurnDelay = 0x01;       // 0x00 t0 0x05   [0-5]     A delay before start turning
     AccTimeOfStart = 0x00;  // 0x00 to 0x32   [0-50]    increase this will make wheels slower
     SenRocker = 0x83;       // Don't need to change     this is for curving motion, we have our own calculation.
     UnderVolt1 = 0x14;      // 0x12 -> 18.0V, 0x13 -> 19.0V, 0x14 -> 20.0V, 0x15 -> 21.0V, 0x16 -> 22.0V
     UnderVolt2 = 0x05;      // 0x01 to 0x09 -> 0.1V tp 0.9V
-    StartSpeed = 0x05;      // 0x00 to 0x64   [0-100]   starting speed if too high you will hear some cogging sound out from gear, set not too high
+    StartSpeed = 0x0A;      // 0x00 to 0x64   [0-100]   starting speed if too high you will hear some cogging sound out from gear, set not too high
     DriveMode = 0x01;       // 0x01 is Sine wave, 0x00 is square wave. Don't need to change, square wave seems not working well...
     PhaseLMotor = 0x03;     // Don't need to change     not sure what is this, so leave it alone 
     PhaseRMotor = 0x04;     // Don't need to change     not sure what is this, so leave it alone
@@ -100,7 +100,7 @@ void XWheels::main_worker() {
 	// previously it was 1000ms but I changed it to a bit longer
     // seem like when the wheels are in ESC error situation, and we resest it again (by NVIC_SystemReset)
     // when it comes back, it will become able to work faster than than small delay
-    ThisThread::sleep_for(3000);
+    ThisThread::sleep_for(3000);  //3000
 
 	//u_printf("Trying to start XWheels...\n");
 
@@ -109,8 +109,8 @@ void XWheels::main_worker() {
 	ThisThread::sleep_for(219);
 	ESCHandShake();
 
-	_rpm_motor_1 = 0;
-	_rpm_motor_2 = 0;
+	_rpm_motor_1 = 0.0;
+	_rpm_motor_2 = 0.0;
 
 	send_motor_command();
 
@@ -118,7 +118,7 @@ void XWheels::main_worker() {
     _uart->attach(callback(this, &XWheels::Rx_Interrupt));
 	while (true) {
 		send_motor_command();
-        u_printf("show_response %x %x %x %x %x %x", show_response[0],show_response[1],show_response[2],show_response[3],show_response[4],show_response[5]);
+        //u_printf("show_response %x %x %x %x %x %x", show_response[0],show_response[1],show_response[2],show_response[3],show_response[4],show_response[5]);
 	}
 }
 
@@ -225,6 +225,16 @@ void XWheels::send_motor_command(){
     uint8_t *Motor1SpeedByte;
     uint8_t *Motor2SpeedByte;
 
+    unsigned char Modehibyte = 0x00;
+    unsigned char Modelobyte = 0x00;
+
+    // There is some problem with these two bytes
+    // when I set to 0x00 for both like I did before, 
+    // the wheels didn't stop after release stick, but it has brake
+    // but with 0xB4 and 0x80, the ESC doesn't brake, not sure why
+    // I fixied it temporaly by using spring mechanical brake
+   
+
     // Type-casting trick to turn a 16 bit into a pair of 8 bits's
     Motor1SpeedByte = (uint8_t *) &motor1_int;
     Motor2SpeedByte = (uint8_t *) &motor2_int;
@@ -235,8 +245,16 @@ void XWheels::send_motor_command(){
     unsigned char Motor2hibyte = Motor2SpeedByte[1];
     unsigned char Motor2lobyte = Motor2SpeedByte[0];
 
-    unsigned char Modehibyte = 0xB4; //0x00;   
-    unsigned char Modelobyte = 0x80; //0x00;
+
+    // Try to change mode bytes during operation, but not worked well
+    // if ((_rpm_motor_1 == 0.0) && (_rpm_motor_2 == 0.0)){
+    // 	Modehibyte = 0xB4; //0xB4; //0x00;   
+    // 	Modelobyte = 0x00;//0x80; //0x00;
+    // } else{
+    // 	Modehibyte = 0xB4; //0xB4; //0x00;   
+    // 	Modelobyte = 0x80;//0x80; //0x00;
+    // }
+    
 
     unsigned char CheckSum = Header1 + Header2 + Motor1hibyte + Motor1lobyte + Motor2hibyte + Motor2lobyte + Modehibyte + Modelobyte;
 
@@ -269,8 +287,8 @@ void XWheels::vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]){
     // In case the stick near mid for both ch2 and ch4
     if (LR_ch <= MAX_DEADBAND && LR_ch >= MIN_DEADBAND && UD_ch <= MAX_DEADBAND && UD_ch >= MIN_DEADBAND)
     {
-        MotorRPM[0] = ZERO_RPM;
-        MotorRPM[1] = ZERO_RPM;
+        MotorRPM[0] = 0.0;
+        MotorRPM[1] = 0.0;
     }
 
     // user push ch2 up or down, UGV drive forward or backward, two wheels same speed and direction
@@ -324,6 +342,66 @@ void XWheels::vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]){
         //printf("SCALE %f\n",SCALE);
     }  
    
+}
+
+void XWheels::vehicleControlProportionalMixing(int UD_ch, int LR_ch, float MotorRPM[2]){   
+    // UD_ch is up-down stick channel, in this case is ch2
+    // LR_ch is left-right stick channel, in this case is ch4
+    // MotorRPM[0] is a right wheel
+    // MotorRPM[1] is a left wheel
+
+	// I followed the method from this video 
+	// https://www.youtube.com/watch?v=t1NSeMTVRH8
+
+	// the speed changing is smooth, but just curvy backward is opposite
+
+    float y = (float)_linear_map(UD_ch, MIN_STICK, MAX_STICK, -100.0, 100.0);
+    float x = (float)_linear_map(LR_ch, MIN_STICK, MAX_STICK, -100.0, 100.0);
+
+    float left = y+x;
+    float right = y-x;
+
+    float diff = abs(x) - abs(y);
+
+    float swap;
+
+
+    if (left < 0.0){
+    	left = left - abs(diff);
+    } else{
+    	left = left + abs(diff);
+    }
+
+
+    if (right < 0.0){
+    	right = right - abs(diff);
+    } else{
+    	right = right + abs(diff);
+    }
+
+    // This is in case correct curvy backward, but it doesn't smooth, when suddenly changes
+    // if (_pre_Y < 0.0){
+    // 	swap = left;
+    // 	left = right;
+    // 	right = swap;
+    // }
+    // _pre_Y = y;
+
+    // some deadband
+   	if (abs(left) < 2.0){
+   		left = 0.0;
+   	}
+   	if (abs(right) < 2.0){
+   		right = 0.0;
+   	}
+
+    //left = _linear_map(left, -200.0, 200.0, -100.0, 100.0);
+    //right = _linear_map(right, -200.0, 200.0, -100.0, 100.0);
+
+    MotorRPM[0] = _linear_map(right, -200.0, 200.0, -MAX_RPM, MAX_RPM);
+	MotorRPM[1] = _linear_map(left, -200.0, 200.0, -MAX_RPM, MAX_RPM);
+	
+    //_usb_debug->printf("left: %f   right: %f   \n", left, right);
 }
 
 

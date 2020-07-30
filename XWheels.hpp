@@ -21,6 +21,9 @@ class XWheels
 
         void vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]);
         // vehcileControl: Convert the stick value to motor's RPM value and pass it to DriveWheels function
+
+        void vehicleControlProportionalMixing(int UD_ch, int LR_ch, float MotorRPM[2]);
+        // vehicleControlProportionalMixing: another option of stick mixing mode, this is more natural feeling
 #ifdef _KO_PROPO
 
         int MIN_STICK = 430;     
@@ -48,7 +51,7 @@ class XWheels
         int MID_STICK = 1024;
         int DIVIDER = 2;           // a divider of another wheel's speed, e.g. 2 is half speed of the another wheel's speed
 
-        float MAX_RPM = 60.0;
+        float MAX_RPM = 144.0;
         float ZERO_RPM = 0.0;  //1.4720
 #endif
 
@@ -143,6 +146,8 @@ class XWheels
         unsigned char PhaseRMotor;
         unsigned char MotorConfig;
         unsigned char InitCheckSum;
+
+        float _pre_Y;
 
 
 };
