@@ -35,7 +35,7 @@ class XWheels
         int MID_STICK = 1009;
         int DIVIDER = 2;           // a divider of another wheel's speed, e.g. 2 is half speed of the another wheel's speed
 
-        float MAX_RPM = 144.0;
+        float MAX_RPM = 130.0;
         float ZERO_RPM = 0.0;
 
 #endif
@@ -51,7 +51,7 @@ class XWheels
         int MID_STICK = 1024;
         int DIVIDER = 2;           // a divider of another wheel's speed, e.g. 2 is half speed of the another wheel's speed
 
-        float MAX_RPM = 144.0;
+        float MAX_RPM = 130.0;
         float ZERO_RPM = 0.0;  //1.4720
 #endif
 
@@ -66,7 +66,7 @@ class XWheels
         int MID_STICK = 1024;
         int DIVIDER = 2;           // a divider of another wheel's speed, e.g. 2 is half speed of the another wheel's speed
 
-        float MAX_RPM = 144.0;         // Max RPM of the wheels, this is limited by wheels itself. Default is 144
+        float MAX_RPM = 130.0;         // Max RPM of the wheels, this is limited by wheels itself. Default is 144
         float ZERO_RPM = 0.0;        // this may need to adjust according to each robot,
                                        // it's the minimum value that the robot will keep click the relay but the wheel doesn't turn
                                        // This will trick the ESC that the robot pretend to stop

@@ -30,7 +30,7 @@ XWheels::XWheels(PinName a, PinName b) {
     InitHeader2 = 0x11;     // always constant
     ForwardAcc = 0x32;      // 0x00 to 0x64   [0-100]   An acceleration when changing speed value
     ForwardDelay = 0x00;    // 0x00 t0 0x05   [0-5]     A delay before start to go
-    BrakeDis = 0x0A;        // 0x01 to 0x64   [0-100]   Brake distance, should be as short as possible (rigid brake), DONT'T PUT 0x00
+    BrakeDis = 0x32;        // 0x01 to 0x64   [0-100]   Brake distance, should be as short as possible (rigid brake), DONT'T PUT 0x00
     TurnAcc = 0x32;         // 0x00 to 0x64   [0-100]   Turning acceleration, when two wheels has reverse direction
     TurnDelay = 0x01;       // 0x00 t0 0x05   [0-5]     A delay before start turning
     AccTimeOfStart = 0x00;  // 0x00 to 0x32   [0-50]    increase this will make wheels slower
@@ -355,53 +355,62 @@ void XWheels::vehicleControlProportionalMixing(int UD_ch, int LR_ch, float Motor
 
 	// the speed changing is smooth, but just curvy backward is opposite
 
-    float y = (float)_linear_map(UD_ch, MIN_STICK, MAX_STICK, -100.0, 100.0);
-    float x = (float)_linear_map(LR_ch, MIN_STICK, MAX_STICK, -100.0, 100.0);
+	if (((UD_ch > MIN_DEADBAND) && (UD_ch < MAX_DEADBAND)) && ((LR_ch > MIN_DEADBAND) && (LR_ch < MAX_DEADBAND))) {
+		MotorRPM[0] = 0.0;
+		MotorRPM[1] = 0.0;
+	} else{
 
-    float left = y+x;
-    float right = y-x;
+		float y = (float)_linear_map(UD_ch, MIN_STICK, MAX_STICK, -100.0, 100.0);
+		float x = (float)_linear_map(LR_ch, MIN_STICK, MAX_STICK, -100.0, 100.0);
 
-    float diff = abs(x) - abs(y);
+		float left = y+x;
+		float right = y-x;
 
-    float swap;
+		float diff = abs(x) - abs(y);
 
-
-    if (left < 0.0){
-    	left = left - abs(diff);
-    } else{
-    	left = left + abs(diff);
-    }
+		float swap;
 
 
-    if (right < 0.0){
-    	right = right - abs(diff);
-    } else{
-    	right = right + abs(diff);
-    }
+		if (left < 0.0){
+			left = left - abs(diff);
+		} else{
+			left = left + abs(diff);
+		}
 
-    // This is in case correct curvy backward, but it doesn't smooth, when suddenly changes
-    // if (_pre_Y < 0.0){
-    // 	swap = left;
-    // 	left = right;
-    // 	right = swap;
-    // }
-    // _pre_Y = y;
 
-    // some deadband
-   	if (abs(left) < 2.0){
-   		left = 0.0;
-   	}
-   	if (abs(right) < 2.0){
-   		right = 0.0;
-   	}
+		if (right < 0.0){
+			right = right - abs(diff);
+		} else{
+			right = right + abs(diff);
+		}
 
-    //left = _linear_map(left, -200.0, 200.0, -100.0, 100.0);
-    //right = _linear_map(right, -200.0, 200.0, -100.0, 100.0);
+		// This is in case correct curvy backward, but it doesn't smooth, when suddenly changes
+		// if (_pre_Y < 0.0){
+		// 	swap = left;
+		// 	left = right;
+		// 	right = swap;
+		// }
+		// _pre_Y = y;
 
-    MotorRPM[0] = _linear_map(right, -200.0, 200.0, -MAX_RPM, MAX_RPM);
-	MotorRPM[1] = _linear_map(left, -200.0, 200.0, -MAX_RPM, MAX_RPM);
-	
-    //_usb_debug->printf("left: %f   right: %f   \n", left, right);
+		// some deadband
+			if (abs(left) < 2.0){
+				left = 0.0;
+			}
+			if (abs(right) < 2.0){
+				right = 0.0;
+			}
+
+		//left = _linear_map(left, -200.0, 200.0, -100.0, 100.0);
+		//right = _linear_map(right, -200.0, 200.0, -100.0, 100.0);
+
+		MotorRPM[0] = _linear_map(right, -200.0, 200.0, -MAX_RPM, MAX_RPM);
+		MotorRPM[1] = _linear_map(left, -200.0, 200.0, -MAX_RPM, MAX_RPM);
+
+		//_usb_debug->printf("left: %f   right: %f   \n", left, right);
+
+	}
+
+    
 }
 
 
