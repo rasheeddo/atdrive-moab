@@ -385,12 +385,12 @@ void XWheels::vehicleControlProportionalMixing(int UD_ch, int LR_ch, float Motor
 		}
 
 		// This is in case correct curvy backward, but it doesn't smooth, when suddenly changes
-		// if (_pre_Y < 0.0){
-		// 	swap = left;
-		// 	left = right;
-		// 	right = swap;
-		// }
-		// _pre_Y = y;
+		if (_pre_Y < 0.0){
+			swap = left;
+			left = right;
+			right = swap;
+		}
+		_pre_Y = y;
 
 		// some deadband
 			if (abs(left) < 2.0){
