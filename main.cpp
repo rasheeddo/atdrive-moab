@@ -188,7 +188,7 @@ void set_mode_manual() {
 	sbus_a_forImuPacket = sbup.ch2;
 	sbus_b_forImuPacket = sbup.ch3;
 	//drive.vehicleControl(sbup.ch3, sbup.ch2, motorRPM);
-	drive.vehicleControlProportionalMixing(sbup.ch3, sbup.ch2, motorRPM);
+	drive.vehicleControlProportionalMixing(sbup.ch1, sbup.ch2, motorRPM);
 #endif
 
 #ifdef _LTE_PROPO
