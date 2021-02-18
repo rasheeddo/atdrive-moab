@@ -93,10 +93,10 @@ void u_printf(const char *fmt, ...) {
 }
 
 
-//uint16_t auto_ch1 = 1024;
-//uint16_t auto_ch2 = 1024;
-float rpmR;
-float rpmL; 
+uint16_t auto_ch1 = 1018;	//1024;
+uint16_t auto_ch2 = 1018;	//1024;
+// float rpmR;
+// float rpmL; 
 void udp_rx_worker() {
 	/*
 	 * Here we receive throttle and steering control from the auto-pilot computer
@@ -105,8 +105,8 @@ void udp_rx_worker() {
 	char inputBuffer[33];
 	inputBuffer[32] = 0;
 	uint64_t _last_autopilot = 0;
-	float *control = (float *) &(inputBuffer[0]);
-	//uint16_t *control = (uint16_t *) &(inputBuffer[0]);
+	// float *control = (float *) &(inputBuffer[0]);
+	uint16_t *control = (uint16_t *) &(inputBuffer[0]);
 
 	rx_sock.set_blocking(true);
 	rx_sock.set_timeout(500);
@@ -116,17 +116,17 @@ void udp_rx_worker() {
 		int n = rx_sock.recvfrom(&sockAddr, inputBuffer, 64);
 		uint64_t ts = rtos::Kernel::get_ms_count();
 		if (ts - _last_autopilot > 500) {
-			if (rpmR != 0.0 || rpmL != 0.0) {
+			if (auto_ch1 != 1018 || auto_ch2 != 1018) { //if (rpmR != 0.0 || rpmL != 0.0) {
 				u_printf("Timeout: resetting auto sbus values\n");
-				rpmR = drive.ZERO_RPM;		//auto_ch1 = 1024;
-				rpmL = drive.ZERO_RPM;		//auto_ch2 = 1024;
+				auto_ch1 = 1018;
+				auto_ch2 = 1018;
 			}
 		}
 
-		if (n == 2*sizeof(float)) {
+		if (n == 2*sizeof(uint16_t)) {
 			_last_autopilot = ts;
-			rpmR = control[0];		//auto_ch1 = control[0];
-			rpmL = control[1];		//auto_ch2 = control[1];	
+			auto_ch1 = control[0];	//rpmR = control[0];		
+			auto_ch2 = control[1];	//rpmL = control[1];
 		} else if (n > 0) {
 			inputBuffer[n] = 0;
 			printf("rx %d bytes:\r\n", n);
@@ -225,7 +225,11 @@ void set_mode_auto() {
 	//u_printf("auto motor: %f %f\n", leftRPM, rightRPM);
 	drive.setRPMs(rightRPM, leftRPM);
 	*/
-	drive.setRPMs(rpmR,rpmL);
+#ifdef _KO_PROPO
+	drive.vehicleControlProportionalMixing(auto_ch1, auto_ch2, motorRPM);
+#endif
+
+	drive.setRPMs(motorRPM[0],motorRPM[1]);		//drive.setRPMs(rpmR,rpmL);
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
 }
