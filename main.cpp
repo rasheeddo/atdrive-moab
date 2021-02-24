@@ -91,8 +91,8 @@ void u_printf(const char *fmt, ...) {
 		return;
 	}
 }
-
-
+uint16_t steering_ch;
+uint16_t throttle_ch;
 uint16_t auto_ch1 = 1018;	//1024;
 uint16_t auto_ch2 = 1018;	//1024;
 // float rpmR;
@@ -188,24 +188,27 @@ void set_mode_manual() {
 	sbus_a_forImuPacket = sbup.ch2;
 	sbus_b_forImuPacket = sbup.ch3;
 	//drive.vehicleControl(sbup.ch3, sbup.ch2, motorRPM);
-	drive.vehicleControlProportionalMixing(sbup.ch1, sbup.ch2, motorRPM);
+	steering_ch = sbup.ch2;
+	throttle_ch = sbup.ch1;
 #endif
 
 #ifdef _LTE_PROPO
 	sbus_a_forImuPacket = sbup.ch1;
 	sbus_b_forImuPacket = sbup.ch2;
 	//drive.vehicleControl(sbup.ch2, sbup.ch1, motorRPM);
-	drive.vehicleControlProportionalMixing(sbup.ch2, sbup.ch1, motorRPM);
+	steering_ch = sbup.ch2;
+	throttle_ch = sbup.ch1;
 #endif
 
 #ifdef _FUTABA
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
 	//drive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
-	drive.vehicleControlProportionalMixing(sbup.ch2, sbup.ch4, motorRPM);
+	steering_ch = sbup.ch2;
+	throttle_ch = sbup.ch4;
 #endif
-
-	u_printf("ch2 %d  ch4 %d  rpmR %f  rpmL %f ", sbup.ch2, sbup.ch4, motorRPM[0], motorRPM[1]);
+	drive.vehicleControlProportionalMixing(throttle_ch, steering_ch, motorRPM);
+	u_printf("steering_ch %d  throttle_ch %d  rpmR %f  rpmL %f \n", steering_ch, throttle_ch, motorRPM[0], motorRPM[1]);
 	drive.setRPMs(motorRPM[0],motorRPM[1]);
 }
 
@@ -232,6 +235,7 @@ void set_mode_auto() {
 	drive.setRPMs(motorRPM[0],motorRPM[1]);		//drive.setRPMs(rpmR,rpmL);
 	sbus_a_forImuPacket = sbup.ch4;
 	sbus_b_forImuPacket = sbup.ch2;
+	u_printf("auto_ch1 %d  auto_ch2 %d  rpmR %f  rpmL %f \n", auto_ch1, auto_ch2, motorRPM[0], motorRPM[1]);
 }
 
 

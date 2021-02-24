@@ -30,9 +30,9 @@ class XWheels
         int MAX_STICK = 1600;    
 
         int MIN_DEADBAND = 999;
-        int MAX_DEADBAND = 1019;
+        int MAX_DEADBAND = 1029; //1019
 
-        int MID_STICK = 1009;
+        int MID_STICK = 1019;   //1009
         int DIVIDER = 2;           // a divider of another wheel's speed, e.g. 2 is half speed of the another wheel's speed
 
         float MAX_RPM = 130.0;
