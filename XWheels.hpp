@@ -35,7 +35,7 @@ class XWheels
         int MID_STICK = 1019;   //1009
         int DIVIDER = 2;           // a divider of another wheel's speed, e.g. 2 is half speed of the another wheel's speed
 
-        float MAX_RPM = 130.0;
+        float MAX_RPM = 100.0;
         float ZERO_RPM = 0.0;
 
 #endif

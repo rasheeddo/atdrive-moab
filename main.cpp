@@ -20,10 +20,10 @@
 
 //#include "misc_math.hpp"
 
-#include "daemons/IMU_daemon.hpp"
-#include "daemons/GPS_daemon.hpp"
-#include "daemons/RTCM3_daemon.hpp"
-#include "daemons/PushButton_daemon.hpp"
+//#include "daemons/IMU_daemon.hpp"
+//#include "daemons/GPS_daemon.hpp"
+//#include "daemons/RTCM3_daemon.hpp"
+//#include "daemons/PushButton_daemon.hpp"
 //#include "daemons/MUXBoard_daemon.hpp"
 #include "SbusParser.hpp"
 //#include "MotorControl.hpp"
@@ -60,10 +60,10 @@ uint16_t sbus_b_forImuPacket = 352;
 
 // Background I/O processes:
 //  (minimal inter-dependence; mostly independent of anything else)
-IMU_daemon imu_daemon(&tx_sock, &sbus_a_forImuPacket, &sbus_b_forImuPacket);
-GPS_daemon gps_daemon(PE_8, PE_7, &net);
+//IMU_daemon imu_daemon(&tx_sock, &sbus_a_forImuPacket, &sbus_b_forImuPacket);
+//GPS_daemon gps_daemon(PE_8, PE_7, &net);
 //RTCM3_daemon rtcm3_daemon(PD_5, PD_6, &tx_sock);
-PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
+//PushButton_daemon pushButton_daemon(PE_9, &tx_sock);
 //MUXBoard_daemon mux_daemon(PD_5, PD_6, &tx_sock);
 
 // Motors:
@@ -154,6 +154,7 @@ void set_mode_sbus_failsafe() {
 	drive.setRPMs(0.0, 0.0);
 	sbus_a_forImuPacket = 1024;
 	sbus_b_forImuPacket = 352;
+	u_printf("sbus_failsafe\n");
 }
 
 void set_mode_stop() {
@@ -166,6 +167,7 @@ void set_mode_stop() {
 	drive.setRPMs(0.0, 0.0);
 	sbus_a_forImuPacket = 1024;
 	sbus_b_forImuPacket = 352;
+	u_printf("stop_mode\n");
 }
 
 void set_mode_manual() {
@@ -188,8 +190,8 @@ void set_mode_manual() {
 	sbus_a_forImuPacket = sbup.ch2;
 	sbus_b_forImuPacket = sbup.ch3;
 	//drive.vehicleControl(sbup.ch3, sbup.ch2, motorRPM);
-	steering_ch = sbup.ch2;
-	throttle_ch = sbup.ch1;
+	steering_ch = sbup.ch2;//sbup.ch4;//
+	throttle_ch = sbup.ch1;//sbup.ch3;//
 #endif
 
 #ifdef _LTE_PROPO
@@ -289,12 +291,13 @@ void sbus_reTx_worker() {
 
 #ifdef _KO_PROPO
 
-			if (sbup.ch7 < 1050 && sbup.ch7 > 950 && sbup.ch8 < 1050 && sbup.ch8 > 950 && sbup.ch6 < 1500 && !stop_trig) {
+			if (sbup.ch7 <= 1050 && sbup.ch7 > 950 && sbup.ch8 <= 1050 && sbup.ch8 > 950 && sbup.ch6 < 1500 && !stop_trig) {
 				set_mode_manual();
-			} else if (sbup.ch7 > 1050 && sbup.ch7 < 1100 && sbup.ch8 > 1050 && sbup.ch8 < 1100 && sbup.ch6 < 1500 && !stop_trig) {
+			} else if (sbup.ch7 > 1050 && sbup.ch7 < 1150 && sbup.ch8 > 1050 && sbup.ch8 < 1150 && sbup.ch6 < 1500 && !stop_trig) {
 				set_mode_auto();
 			} else {
 				set_mode_stop();
+				//set_mode_manual();
 				if (sbup.ch5 > 1500){
 					stop_trig = false;
 				} else {
@@ -432,8 +435,8 @@ int main() {
 	udp_rx_thread.start(udp_rx_worker);
 	sbus_reTx_thread.start(sbus_reTx_worker);
 
-	imu_daemon.Start();  // will start a separate thread
-	gps_daemon.Start();  // will start a separate thread
+	//imu_daemon.Start();  // will start a separate thread
+	//gps_daemon.Start();  // will start a separate thread
 	//rtcm3_daemon.Start();  // will start a separate thread
 	//pushButton_daemon.Start();  // will start a separate thread
 	//mux_daemon.Start();
