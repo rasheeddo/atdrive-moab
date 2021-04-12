@@ -230,9 +230,8 @@ void set_mode_auto() {
 	//u_printf("auto motor: %f %f\n", leftRPM, rightRPM);
 	drive.setRPMs(rightRPM, leftRPM);
 	*/
-#ifdef _KO_PROPO
+
 	drive.vehicleControlProportionalMixing(auto_ch1, auto_ch2, motorRPM);
-#endif
 
 	drive.setRPMs(motorRPM[0],motorRPM[1]);		//drive.setRPMs(rpmR,rpmL);
 	sbus_a_forImuPacket = sbup.ch4;
